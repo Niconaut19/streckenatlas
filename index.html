@@ -206,6 +206,19 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .kmbig{font-weight:600;color:var(--muted);font-size:15px;font-variant-numeric:tabular-nums}
 .linerow{cursor:pointer;-webkit-user-select:none;user-select:none}
 .linerow:active{background:var(--grey-1)}
+.tour{position:fixed;inset:0;z-index:70}
+.tour-spot{position:fixed;border-radius:16px;box-shadow:0 0 0 9999px rgba(20,24,30,.62);transition:all .35s var(--ease);pointer-events:none}
+.tour-spot.center{left:50%!important;top:50%!important;width:0!important;height:0!important}
+.tour-card{position:fixed;left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));max-width:400px;margin:0 auto;
+  background:var(--white);border-radius:16px;padding:20px 20px 14px;box-shadow:var(--shadow);transition:top .35s var(--ease),bottom .35s var(--ease);animation:pop .25s var(--ease)}
+.tour-card h2{margin:2px 0 6px;font-size:20px;font-weight:800;letter-spacing:-.01em}
+.tour-card p{margin:0;color:var(--ink-2);line-height:1.5}
+.tour-step{font-size:12px;font-weight:700;color:var(--red)}
+.tour-dots{display:flex;gap:6px;margin:14px 0 10px}
+.tour-dots i{width:7px;height:7px;border-radius:50%;background:var(--grey-2);transition:background .2s,width .2s}
+.tour-dots i.on{background:var(--red);width:20px;border-radius:4px}
+.tour-nav{display:flex;align-items:center;gap:8px}
+.tour-nav .spacer{flex:1}
 .toast{position:fixed;z-index:60;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);
   transform:translate(-50%,20px);opacity:0;transition:all .3s var(--ease);pointer-events:none;
   background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-weight:600;max-width:calc(100% - 110px);text-align:center;box-shadow:var(--shadow)}
@@ -323,6 +336,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
     <div class="group" id="teamBox" hidden><h3>Team &amp; Rollen</h3>
       <p class="hint" style="margin-bottom:10px">Neue Konten warten auf Freischaltung. Hinzufügen darf jeder, entfernen nur Admins.</p>
       <div class="list" id="teamList"></div></div>
+    <button class="btn block" id="btnTour">Einführung ansehen</button>
     <button class="btn block" id="btnLogout">Abmelden</button>
   </div>
 </section>
@@ -392,6 +406,22 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
     <p class="hint">Das Objekt ist danach für alle Kolleginnen und Kollegen sichtbar. Entfernen kann es nur ein Admin.</p>
     <button class="btn primary block" id="cYes">Ja, hinzufügen</button>
     <button class="btn block" id="cBack">Zurück</button>
+  </div>
+</div>
+
+<div class="tour" id="tour" hidden role="dialog" aria-modal="true" aria-labelledby="tourTitle">
+  <div class="tour-spot" id="tourSpot"></div>
+  <div class="tour-card" id="tourCard">
+    <div class="tour-step" id="tourStep"></div>
+    <h2 id="tourTitle"></h2>
+    <p id="tourText"></p>
+    <div class="tour-dots" id="tourDots"></div>
+    <div class="tour-nav">
+      <button class="linkbtn" type="button" id="tourSkip">Überspringen</button>
+      <span class="spacer"></span>
+      <button class="btn" type="button" id="tourBack">Zurück</button>
+      <button class="btn primary" type="button" id="tourNext">Weiter</button>
+    </div>
   </div>
 </div>
 
@@ -1083,6 +1113,55 @@ async function logout(){await api.signOut();me=null;markers=[];mapMarkers.forEac
 $("#btnLogout").onclick=logout; $("#btnLogout2").onclick=logout; $("#btnRecheck").onclick=()=>start();
 
 let subscribed=false;
+/* ============ EINFÜHRUNG für neue Nutzer ============ */
+function tourSteps(){
+  const admin=me&&me.role==="admin";
+  return [
+    {title:`Willkommen${me&&me.name?", "+me.name.split(" ")[0]:""}!`, text:"Der Streckenatlas zeigt dir die Bahnstrecken in Bayern auf amtlichen Luftbildern. Gemeinsam mit den Kollegen tragt ihr Anlagen wie Stellwerke ein. In einer Minute zeige ich dir die wichtigsten Knöpfe."},
+    {sel:"#btnLayers", title:"Karte & Strecken", text:"Hier wählst du die Kartenansicht und schaltest einzelne Strecken an oder aus. Tipp: Erst „Alle aus“, dann deine Streckennummer suchen und einschalten. Bahnhöfe, Bahnübergänge und Kilometer siehst du dann nur an deinen Strecken."},
+    {sel:"#btnAdd", title:"Objekt hinzufügen", text:"Tippe auf das Plus und dann auf die Stelle in der Karte, wo z. B. ein ESTW steht. Art wählen, Bezeichnung eingeben, speichern und mit „Ja, hinzufügen“ bestätigen. Danach sehen es alle Kollegen."},
+    {title:"Objekte & Navigation", text:"Tippe kurz auf einen Pin, eine Strecke oder einen Bahnhof: Du siehst Streckennummer, ungefähren Bahnkilometer und den Knopf „Navigation starten“."+(admin?" Als Admin entfernst du Objekte, indem du den Pin lange gedrückt hältst.":" Entfernen können nur Admins. Ist etwas falsch eingetragen, sag deinem Admin Bescheid.")},
+    {sel:"#btnLocate", title:"Dein Standort", text:"Zeigt dich als blauen Punkt und fliegt ganz nah heran. Die Karte folgt dir, bis du sie selbst verschiebst. Einmal tippen holt dich zurück."},
+    {sel:"#btnCompass", title:"Drehen & Neigen", text:"Mit zwei Fingern drehst du die Karte, mit zwei Fingern nach oben wischen neigst du sie. Der Kompass zeigt Norden. Antippen richtet die Karte wieder gerade aus."},
+    {sel:"#btnReload", title:"Aktualisieren", text:"Tippe auf das Logo, um die App neu zu laden und die neueste Version zu holen."},
+    {sel:"#userChip", title:"Dein Konto", text:(admin?"Hier schaltest du unter „Team & Rollen“ neue Kollegen frei. ":"")+"Hier kannst du dich abmelden und diese Einführung jederzeit wieder ansehen."},
+    {title:"Fertig!", text:"Noch ein Tipp: Leg die App auf deinen Home-Bildschirm. Auf dem iPhone in Safari auf „Teilen“ und dann „Zum Home-Bildschirm“, auf Android im Browser-Menü „App installieren“. Dann startet sie wie eine richtige App."}
+  ];
+}
+let tourIdx=0, tourList=[];
+function tourKey(){return "sa_tour_done_"+(me?me.id:"x");}
+function startTour(){closeSheets();setAddMode(false);tourList=tourSteps();tourIdx=0;$("#tour").hidden=false;showTourStep();}
+function endTour(){$("#tour").hidden=true;store.set(tourKey(),true);}
+function showTourStep(){
+  const st=tourList[tourIdx], spot=$("#tourSpot"), card=$("#tourCard");
+  $("#tourStep").textContent=`Schritt ${tourIdx+1} von ${tourList.length}`;
+  $("#tourTitle").textContent=st.title; $("#tourText").textContent=st.text;
+  $("#tourDots").innerHTML=tourList.map((_,i)=>`<i class="${i===tourIdx?"on":""}"></i>`).join("");
+  $("#tourBack").hidden=tourIdx===0;
+  $("#tourNext").textContent=tourIdx===tourList.length-1?"Los geht's":"Weiter";
+  $("#tourSkip").hidden=tourIdx===tourList.length-1;
+  const el=st.sel?$(st.sel):null, r=el&&!el.hidden?el.getBoundingClientRect():null;
+  if(r&&r.width){
+    const pad=8;
+    spot.classList.remove("center");
+    Object.assign(spot.style,{left:(r.left-pad)+"px",top:(r.top-pad)+"px",width:(r.width+pad*2)+"px",height:(r.height+pad*2)+"px"});
+    const below=r.top<window.innerHeight/2;
+    card.style.top=below?(r.bottom+pad+14)+"px":"auto";
+    card.style.bottom=below?"auto":(window.innerHeight-r.top+pad+14)+"px";
+  } else {
+    spot.classList.add("center"); spot.removeAttribute("style");
+    card.style.top="50%"; card.style.bottom="auto"; card.style.transform="translateY(-50%)";
+    return;
+  }
+  card.style.transform="none";
+}
+$("#tourNext").onclick=()=>{if(tourIdx<tourList.length-1){tourIdx++;showTourStep();}else endTour();};
+$("#tourBack").onclick=()=>{if(tourIdx>0){tourIdx--;showTourStep();}};
+$("#tourSkip").onclick=endTour;
+$("#btnTour").onclick=startTour;
+window.addEventListener("resize",()=>{if(!$("#tour").hidden) showTourStep();});
+document.addEventListener("keydown",e=>{if($("#tour").hidden)return; if(e.key==="ArrowRight")$("#tourNext").click(); if(e.key==="ArrowLeft")$("#tourBack").click(); if(e.key==="Escape")endTour();});
+
 async function start(){
   me = await api.me();
   if(recovering) return;
@@ -1095,6 +1174,7 @@ async function start(){
   await refreshMarkers();
   if(!subscribed){api.subscribe(()=>refreshMarkers());subscribed=true;}
   if(api.demo && !store.get("sa_demo_seen",false)){store.set("sa_demo_seen",true);toast("Demo-Modus: Daten bleiben nur auf diesem Gerät");}
+  if(!store.get(tourKey(),false)) setTimeout(startTour,700);
 }
 start();
 </script>
