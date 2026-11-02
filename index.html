@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Streckenatlas</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap">
+<style>
+/* Helle Bahn-Optik: weiße Flächen, Verkehrsrot als Leitfarbe, kühle Grautöne */
+:root{
+  --red:#ec0016; --red-dark:#c50014; --red-soft:#fde6e8;
+  --ink:#282d37; --ink-2:#3c414b; --muted:#646973;
+  --grey-1:#f0f3f5; --grey-2:#d7dce1; --white:#ffffff;
+  --green:#408335; --blue:#0c3992;
+  --sans:"Open Sans","Helvetica Neue",Arial,system-ui,sans-serif;
+  --r:12px; --shadow:0 2px 6px rgba(40,45,55,.12),0 8px 24px rgba(40,45,55,.14);
+  --ease:cubic-bezier(.2,.8,.2,1);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;background:var(--grey-1);color:var(--ink);font:15px/1.45 var(--sans);overscroll-behavior:none}
+button,input,select,textarea{font:inherit;color:inherit}
+[hidden]{display:none!important}
+#map{position:fixed;inset:0}
+
+/* Kopfleiste */
+.top{position:fixed;z-index:20;top:calc(env(safe-area-inset-top,0px) + 10px);
+  left:max(10px,env(safe-area-inset-left,0px));right:max(10px,env(safe-area-inset-right,0px));
+  display:flex;gap:8px;align-items:center;pointer-events:none}
+.brand,.chip{pointer-events:auto;background:var(--white);border-radius:var(--r);box-shadow:var(--shadow);height:46px;display:flex;align-items:center}
+.brand{padding:0 14px 0 10px;gap:10px;font-weight:800;font-size:17px;letter-spacing:-.01em}
+.brand .mark{width:28px;height:28px;border-radius:7px;background:var(--red);display:grid;place-items:center}
+.brand .mark svg{width:18px;height:18px}
+.spacer{flex:1}
+.chip{border:0;padding:0 8px 0 6px;gap:8px;cursor:pointer;max-width:58vw;transition:transform .15s var(--ease)}
+.chip:active{transform:scale(.97)}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--grey-1);display:grid;place-items:center;font-weight:700;font-size:13px;flex:none}
+.chip .who{display:flex;flex-direction:column;align-items:flex-start;line-height:1.15;min-width:0}
+.chip .who b{font-size:14px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip .who small{font-size:11px;color:var(--muted);font-weight:600}
+.chip .who small.admin{color:var(--red)}
+
+/* Bedienknöpfe */
+.fabs{position:fixed;z-index:20;right:max(12px,env(safe-area-inset-right,0px));
+  bottom:calc(env(safe-area-inset-bottom,0px) + 26px);display:flex;flex-direction:column;gap:10px;align-items:center;
+  transition:transform .3s var(--ease),opacity .3s}
+.fab{width:50px;height:50px;border-radius:14px;border:0;background:var(--white);color:var(--ink);
+  display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow);transition:transform .15s var(--ease),background .2s}
+.fab:active{transform:scale(.92)}
+.fab svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.fab.primary{width:60px;height:60px;border-radius:50%;background:var(--red);color:#fff}
+.fab.primary svg{width:28px;height:28px;stroke-width:2.4}
+.fab.primary:hover{background:var(--red-dark)}
+#btnCompass svg{transition:transform .1s linear}
+#btnCompass .n{fill:var(--red);stroke:none}
+#btnCompass .s{fill:var(--grey-2);stroke:none}
+button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offset:2px}
+
+/* Hinweis im Setzmodus */
+.banner{position:fixed;z-index:25;left:50%;top:calc(env(safe-area-inset-top,0px) + 66px);
+  transform:translate(-50%,-20px);opacity:0;pointer-events:none;transition:all .3s var(--ease);
+  background:var(--ink);color:#fff;border-radius:999px;padding:6px 6px 6px 16px;display:flex;gap:12px;align-items:center;
+  font-weight:600;font-size:14px;box-shadow:var(--shadow);max-width:calc(100% - 24px)}
+.banner.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+.banner button{background:#fff;color:var(--ink);border:0;border-radius:999px;padding:6px 12px;font-weight:700;cursor:pointer}
+.crosshair{position:fixed;z-index:15;left:50%;top:50%;width:0;height:0;pointer-events:none;opacity:0;transition:opacity .2s}
+.crosshair.on{opacity:1}
+
+/* Bottom-Sheets */
+.scrim{position:fixed;inset:0;z-index:29;background:rgba(40,45,55,.25);opacity:0;pointer-events:none;transition:opacity .3s}
+.scrim.on{opacity:1;pointer-events:auto}
+.sheet{position:fixed;z-index:30;background:var(--white);display:flex;flex-direction:column;
+  left:0;right:0;bottom:0;max-height:82%;border-radius:20px 20px 0 0;box-shadow:0 -6px 30px rgba(40,45,55,.2);
+  padding-bottom:env(safe-area-inset-bottom,0px);transform:translateY(105%);visibility:hidden;
+  transition:transform .38s var(--ease),visibility 0s linear .38s}
+.sheet.open{transform:none;visibility:visible;transition:transform .38s var(--ease),visibility 0s}
+@media (min-width:760px){
+  .sheet{left:auto;right:84px;top:calc(env(safe-area-inset-top,0px) + 66px);bottom:24px;width:390px;max-height:none;border-radius:16px;transform:translateX(30px);opacity:0;transition:transform .3s var(--ease),opacity .3s,visibility 0s linear .3s}
+  .sheet.open{transform:none;opacity:1;transition:transform .3s var(--ease),opacity .3s,visibility 0s}
+  .scrim{display:none}
+}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--grey-2);margin:8px auto 0;flex:none}
+@media (min-width:760px){.grab{display:none}}
+.sheet header{display:flex;align-items:center;gap:8px;padding:12px 12px 10px 20px}
+.sheet h2{margin:0;font-size:20px;font-weight:800;flex:1;letter-spacing:-.01em}
+.x{width:36px;height:36px;border-radius:50%;border:0;background:var(--grey-1);display:grid;place-items:center;cursor:pointer}
+.x svg{width:18px;height:18px;stroke:var(--ink);stroke-width:2.2;fill:none;stroke-linecap:round}
+.body{overflow:auto;padding:0 20px 22px;display:flex;flex-direction:column;gap:22px;-webkit-overflow-scrolling:touch}
+.group h3{margin:0 0 6px;font-size:13px;font-weight:700;color:var(--muted)}
+
+/* Segment-Schalter */
+.seg{display:flex;background:var(--grey-1);border-radius:10px;padding:3px;gap:3px}
+.seg label{flex:1;text-align:center;padding:8px 4px;border-radius:8px;cursor:pointer;font-weight:600;font-size:14px;color:var(--ink-2);transition:background .2s,box-shadow .2s}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label:has(input:checked){background:var(--white);box-shadow:0 1px 4px rgba(40,45,55,.18);color:var(--ink)}
+
+/* Listen mit Schaltern */
+.list{border:1px solid var(--grey-2);border-radius:var(--r);overflow:hidden}
+.opt{display:flex;align-items:center;gap:12px;padding:11px 14px;cursor:pointer;background:var(--white);border-top:1px solid var(--grey-1);min-height:50px}
+.opt:first-child{border-top:0}
+.opt .lbl{flex:1;min-width:0}
+.opt small{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.toggle{position:relative;width:46px;height:28px;flex:none}
+.toggle input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.toggle i{position:absolute;inset:0;border-radius:999px;background:var(--grey-2);transition:background .2s}
+.toggle i::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .22s var(--ease)}
+.toggle input:checked+i{background:var(--red)}
+.toggle input:checked+i::after{transform:translateX(18px)}
+.swatch{width:18px;height:6px;border-radius:3px;flex:none}
+.tag{min-width:30px;height:24px;padding:0 6px;border-radius:6px;display:grid;place-items:center;font-weight:800;font-size:11px;color:#fff;flex:none}
+.ref{font-weight:700;font-variant-numeric:tabular-nums;min-width:3.4em}
+.lname{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.btn{border:1.5px solid var(--grey-2);background:var(--white);border-radius:10px;padding:10px 16px;cursor:pointer;font-weight:700;transition:transform .12s var(--ease),background .2s}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--red);border-color:var(--red);color:#fff}
+.btn.primary:hover{background:var(--red-dark)}
+.btn.danger{background:var(--white);border-color:var(--red);color:var(--red)}
+.btn.danger.armed{background:var(--red);color:#fff}
+.btn.block{width:100%}
+.btn:disabled{opacity:.6}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.hint{color:var(--muted);font-size:14px;margin:0}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:13px;font-weight:700;color:var(--ink-2)}
+.field input,.field select,.field textarea{background:var(--grey-1);border:1.5px solid transparent;border-radius:10px;padding:12px;width:100%;transition:border-color .2s,background .2s;font-size:16px}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--ink);background:var(--white)}
+.field textarea{min-height:84px;resize:vertical}
+.coords{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;margin:0}
+.search{position:relative}
+.search input{padding-left:38px}
+.search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:18px;height:18px;stroke:var(--muted);fill:none;stroke-width:2}
+
+/* Typauswahl als Kacheln */
+.types{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.types label{border:1.5px solid var(--grey-2);border-radius:10px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;font-size:12px;font-weight:600;line-height:1.2;cursor:pointer;transition:border-color .2s,background .2s}
+.types input{position:absolute;opacity:0;pointer-events:none}
+.types label:has(input:checked){border-color:var(--red);background:var(--red-soft)}
+
+/* Anmeldung */
+.gate{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:var(--grey-1);overflow:auto;
+  padding:24px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
+.gate::before{content:"";position:fixed;left:0;right:0;top:0;height:6px;background:var(--red)}
+.card{width:100%;max-width:400px;background:var(--white);border-radius:16px;padding:28px 24px;display:flex;flex-direction:column;gap:16px;box-shadow:var(--shadow)}
+.card .brand{box-shadow:none;padding:0;height:auto;font-size:22px}
+.card .brand .mark{width:36px;height:36px;border-radius:9px}
+.card .brand .mark svg{width:22px;height:22px}
+.card h2{margin:0;font-size:24px;font-weight:800;letter-spacing:-.01em}
+.err{color:var(--red);font-size:14px;margin:0;min-height:1.2em}
+.err.ok{color:var(--green)}
+.tabs{display:flex;background:var(--grey-1);border-radius:10px;padding:3px;gap:3px}
+.tabs button{flex:1;border:0;background:none;padding:9px;border-radius:8px;cursor:pointer;color:var(--ink-2);font-weight:700;transition:background .2s}
+.tabs button[aria-selected="true"]{background:var(--white);box-shadow:0 1px 4px rgba(40,45,55,.18);color:var(--ink)}
+.linkbtn{background:none;border:0;color:var(--ink-2);text-decoration:underline;cursor:pointer;padding:4px;align-self:center;font-size:14px;font-weight:600}
+
+/* Toast */
+.toast{position:fixed;z-index:60;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);
+  transform:translate(-50%,20px);opacity:0;transition:all .3s var(--ease);pointer-events:none;
+  background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-weight:600;max-width:calc(100% - 110px);text-align:center;box-shadow:var(--shadow)}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* Marker */
+.mk{width:34px;height:44px;cursor:pointer;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));transition:transform .2s var(--ease);transform-origin:50% 100%}
+.mk:hover{transform:scale(1.1)}
+.mk svg{display:block;width:34px;height:44px}
+.mk text{font:800 11px var(--sans);fill:#fff}
+.mk.temp{animation:drop .35s var(--ease)}
+@keyframes drop{from{transform:translateY(-30px);opacity:0}to{transform:none;opacity:1}}
+.me-dot{width:20px;height:20px;border-radius:50%;background:var(--blue);border:3px solid #fff;box-shadow:0 0 0 6px rgba(12,57,146,.2),0 2px 4px rgba(0,0,0,.3)}
+
+/* Popups */
+.maplibregl-popup-content{border-radius:14px;padding:16px 18px 14px;box-shadow:var(--shadow);font:14px/1.45 var(--sans);color:var(--ink);min-width:220px}
+.maplibregl-popup-close-button{font-size:20px;width:30px;height:30px;right:4px;top:4px;color:var(--muted);border-radius:50%}
+.pop .t{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--muted)}
+.pop h4{margin:4px 0 2px;font-size:18px;font-weight:800;padding-right:20px}
+.pop p{margin:8px 0}
+.pop .meta{color:var(--muted);font-size:12.5px;border-top:1px solid var(--grey-1);padding-top:8px}
+.maplibregl-ctrl-attrib{font-size:10px;background:rgba(255,255,255,.8)!important}
+.maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right{bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="top">
+  <div class="brand"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M8 3 6 21M16 3l2 18M6.8 8h10.4M6.2 14h11.6"/></svg></span>Streckenatlas</div>
+  <div class="spacer"></div>
+  <button class="chip" id="userChip" hidden><span class="avatar" id="userAvatar"></span><span class="who"><b id="userName"></b><small id="userRole"></small></span></button>
+</div>
+
+<div class="fabs" id="fabs" hidden>
+  <button class="fab" id="btnCompass" title="Nach Norden ausrichten" aria-label="Nach Norden ausrichten">
+    <svg viewBox="0 0 24 24" id="compassIcon"><path class="n" d="M12 3l3.5 9h-7z"/><path class="s" d="M12 21l-3.5-9h7z"/></svg></button>
+  <button class="fab" id="btnLayers" title="Ebenen und Strecken" aria-label="Ebenen und Strecken">
+    <svg viewBox="0 0 24 24"><path d="M12 3 2 8l10 5 10-5-10-5z"/><path d="m2 13 10 5 10-5"/></svg></button>
+  <button class="fab" id="btnLocate" title="Mein Standort" aria-label="Mein Standort">
+    <svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8z"/></svg></button>
+  <button class="fab primary" id="btnAdd" title="Objekt hinzufügen" aria-label="Objekt hinzufügen">
+    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+</div>
+
+<div class="banner" id="addBanner">Tippe auf die Karte, wo das Objekt steht <button id="addCancel">Abbrechen</button></div>
+<div class="scrim" id="scrim"></div>
+
+<!-- Ebenen -->
+<section class="sheet" id="sheetLayers" aria-label="Ebenen">
+  <div class="grab"></div>
+  <header><h2>Karte</h2><button class="x" data-close aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+  <div class="body">
+    <div class="group"><h3>Kartengrundlage</h3>
+      <div class="seg">
+        <label><input type="radio" name="base" value="sat" id="baseSat">Satellit</label>
+        <label><input type="radio" name="base" value="satlab" id="baseSatLab">Mit Orten</label>
+        <label><input type="radio" name="base" value="osm" id="baseOsm">Straße</label>
+      </div>
+    </div>
+    <div class="group"><h3>Bahn-Ebenen</h3><div class="list" id="ormList"></div></div>
+    <div class="group"><h3>Strecken einzeln</h3>
+      <button class="btn primary block" id="btnLoadLines">Strecken im Ausschnitt laden</button>
+      <p class="hint" id="linesHint" style="margin-top:10px">Zoome auf eine Region und lade die Strecken. Jede Strecke mit ihrer Streckennummer lässt sich dann einzeln ein- und ausblenden.</p>
+      <div id="linesBox" hidden style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
+        <div class="field search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="lineFilter" placeholder="Nummer oder Name suchen" aria-label="Strecken suchen"></div>
+        <div class="row"><button class="btn" id="btnAllOn">Alle an</button><button class="btn" id="btnAllOff">Alle aus</button></div>
+        <div class="list" id="lineList"></div>
+      </div>
+    </div>
+    <div class="group"><h3>Erfasste Objekte</h3><div class="list" id="typeList"></div></div>
+  </div>
+</section>
+
+<!-- Objekt anlegen -->
+<section class="sheet" id="sheetAdd" aria-label="Objekt anlegen">
+  <div class="grab"></div>
+  <header><h2>Objekt hinzufügen</h2><button class="x" data-close aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+  <form class="body" id="addForm">
+    <p class="coords" id="addCoords"></p>
+    <div class="group"><h3>Art</h3><div class="types" id="typePick"></div></div>
+    <div class="field"><label for="fTitel">Bezeichnung</label><input id="fTitel" required maxlength="80" placeholder="z. B. ESTW Hannover-Linden"></div>
+    <div class="field"><label for="fNotiz">Notiz (optional)</label><textarea id="fNotiz" maxlength="1000" placeholder="Zugang, Besonderheiten, Strecken-km …"></textarea></div>
+    <button class="btn primary block" type="submit" id="addSave">Speichern</button>
+  </form>
+</section>
+
+<!-- Konto / Team -->
+<section class="sheet" id="sheetUser" aria-label="Konto">
+  <div class="grab"></div>
+  <header><h2>Konto</h2><button class="x" data-close aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+  <div class="body">
+    <div class="group" id="demoSwitch" hidden><h3>Demo: Person wechseln</h3>
+      <p class="hint" style="margin-bottom:10px">Ohne Datenbank läuft die App nur auf diesem Gerät. Wechsle die Person, um die Rechte auszuprobieren.</p>
+      <div class="list" id="demoUsers"></div></div>
+    <div class="group" id="teamBox" hidden><h3>Team &amp; Rollen</h3>
+      <p class="hint" style="margin-bottom:10px">Neue Konten warten auf Freischaltung. Admins dürfen Objekte aller Kolleginnen und Kollegen entfernen.</p>
+      <div class="list" id="teamList"></div></div>
+    <button class="btn block" id="btnLogout">Abmelden</button>
+  </div>
+</section>
+
+<!-- Anmeldung -->
+<div class="gate" id="gate" hidden>
+  <form class="card" id="authForm">
+    <div class="brand"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M8 3 6 21M16 3l2 18M6.8 8h10.4M6.2 14h11.6"/></svg></span>Streckenatlas</div>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" aria-selected="true" data-mode="in">Anmelden</button>
+      <button type="button" role="tab" aria-selected="false" data-mode="up">Registrieren</button>
+    </div>
+    <div class="field" id="nameField" hidden><label for="aName">Name</label><input id="aName" autocomplete="name"></div>
+    <div class="field"><label for="aMail">E-Mail</label><input id="aMail" type="email" required autocomplete="email"></div>
+    <div class="field"><label for="aPw">Passwort</label><input id="aPw" type="password" required minlength="8" autocomplete="current-password"></div>
+    <p class="err" id="authErr"></p>
+    <button class="btn primary block" type="submit" id="authBtn">Anmelden</button>
+    <button class="linkbtn" type="button" id="btnForgot">Passwort vergessen?</button>
+  </form>
+</div>
+
+<div class="gate" id="resetGate" hidden>
+  <form class="card" id="resetForm">
+    <h2>Neues Passwort</h2>
+    <p class="hint">Gib dein neues Passwort ein. Danach bist du direkt angemeldet.</p>
+    <div class="field"><label for="rPw">Neues Passwort</label><input id="rPw" type="password" required minlength="8" autocomplete="new-password"></div>
+    <div class="field"><label for="rPw2">Passwort wiederholen</label><input id="rPw2" type="password" required minlength="8" autocomplete="new-password"></div>
+    <p class="err" id="resetErr"></p>
+    <button class="btn primary block" type="submit" id="resetBtn">Passwort speichern</button>
+  </form>
+</div>
+
+<div class="gate" id="pending" hidden>
+  <div class="card"><h2>Fast geschafft</h2>
+    <p class="hint">Dein Konto ist angelegt. Ein Admin muss es noch freischalten, danach siehst du die Karte.</p>
+    <button class="btn primary block" id="btnRecheck">Erneut prüfen</button>
+    <button class="btn block" id="btnLogout2">Abmelden</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+/* ============ EINSTELLUNGEN ============
+   Leer lassen = Demo-Modus (nur auf diesem Gerät). */
+const CONFIG = {
+  SUPABASE_URL: "https://vefddgcqwfyiuwejuvmn.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_wH-ZHjT7iX1LRWHSvKeOmQ_wWDVTBHr"
+};
+
+const TYPES = {
+  estw:   {label:"Elektronisches Stellwerk", short:"ES", color:"#ec0016"},
+  rsto:   {label:"Relaisstellwerk",          short:"Rs", color:"#a9455d"},
+  mech:   {label:"Mech. Stellwerk",          short:"Me", color:"#814997"},
+  bue:    {label:"Bahnübergang",             short:"BÜ", color:"#f39200"},
+  signal: {label:"Signal",                   short:"Si", color:"#408335"},
+  weiche: {label:"Weiche",                   short:"W",  color:"#0c3992"},
+  uw:     {label:"Unterwerk / Schaltposten", short:"UW", color:"#309fd1"},
+  gsmr:   {label:"GSM-R-Mast",               short:"GS", color:"#00a099"},
+  sonst:  {label:"Sonstiges",                short:"?",  color:"#646973"}
+};
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtDate = iso => new Date(iso).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"});
+let toastT; function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("on");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("on"),3000);}
+const store = { get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}}, set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}} };
+const vibrate = ms => { try{navigator.vibrate&&navigator.vibrate(ms)}catch{} };
+
+/* ============ BACKEND: Supabase oder Demo ============ */
+function supabaseBackend(){
+  const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+  async function me(){
+    const {data:{session}} = await sb.auth.getSession();
+    if(!session) return null;
+    const {data} = await sb.from("profiles").select("*").eq("id",session.user.id).maybeSingle();
+    return data ? {id:data.id,name:data.name||data.email,email:data.email,role:data.role} : {id:session.user.id,name:session.user.email,role:"wartend"};
+  }
+  return {
+    demo:false, me,
+    async signIn(email,pw){const {error}=await sb.auth.signInWithPassword({email,password:pw}); if(error) throw error;},
+    async signUp(email,pw,name){const {error}=await sb.auth.signUp({email,password:pw,options:{data:{name}}}); if(error) throw error;},
+    async signOut(){await sb.auth.signOut();},
+    async resetPassword(email){const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname}); if(error) throw error;},
+    async updatePassword(pw){const {error}=await sb.auth.updateUser({password:pw}); if(error) throw error;},
+    onRecovery(cb){sb.auth.onAuthStateChange(ev=>{if(ev==="PASSWORD_RECOVERY") cb();});},
+    async listMarkers(){const {data,error}=await sb.from("markers").select("*").order("created_at"); if(error) throw error; return data;},
+    async addMarker(m){const {error}=await sb.from("markers").insert(m); if(error) throw error;},
+    async deleteMarker(id){const {error,count}=await sb.from("markers").delete({count:"exact"}).eq("id",id); if(error) throw error; if(!count) throw new Error("Keine Berechtigung");},
+    async listProfiles(){const {data,error}=await sb.from("profiles").select("*").order("created_at"); if(error) throw error; return data;},
+    async setRole(id,role){const {error}=await sb.from("profiles").update({role}).eq("id",id); if(error) throw error;},
+    subscribe(cb){sb.channel("markers").on("postgres_changes",{event:"*",schema:"public",table:"markers"},cb).subscribe();}
+  };
+}
+function demoBackend(){
+  const users = store.get("sa_demo_users",[
+    {id:"u-admin",name:"Demo-Admin",email:"admin@demo",role:"admin",created_at:"2026-01-01"},
+    {id:"u-anna",name:"Anna",email:"anna@demo",role:"mitarbeiter",created_at:"2026-01-02"},
+    {id:"u-ben",name:"Ben",email:"ben@demo",role:"mitarbeiter",created_at:"2026-01-03"}
+  ]);
+  const saveUsers=()=>store.set("sa_demo_users",users);
+  let markers = store.get("sa_demo_markers",[]);
+  const save=()=>store.set("sa_demo_markers",markers);
+  let current = store.get("sa_demo_me","u-admin");
+  return {
+    demo:true, users,
+    async me(){return users.find(u=>u.id===current)||users[0];},
+    switchTo(id){current=id;store.set("sa_demo_me",id);},
+    async signOut(){},
+    async listMarkers(){return markers;},
+    async addMarker(m){markers.push({...m,id:crypto.randomUUID(),created_by:current,created_at:new Date().toISOString()});save();},
+    async deleteMarker(id){const m=markers.find(x=>x.id===id);const u=users.find(x=>x.id===current);
+      if(!m) return; if(m.created_by!==current && u.role!=="admin") throw new Error("Keine Berechtigung"); markers=markers.filter(x=>x.id!==id);save();},
+    async listProfiles(){return users;},
+    async setRole(id,role){users.find(u=>u.id===id).role=role;saveUsers();},
+    subscribe(){}
+  };
+}
+const api = CONFIG.SUPABASE_URL ? supabaseBackend() : demoBackend();
+
+/* ============ KARTE (MapLibre: drehen, neigen, weich zoomen) ============ */
+const ORM = [
+  {key:"standard",        label:"Infrastruktur",          color:"#f39200", def:true},
+  {key:"maxspeed",        label:"Höchstgeschwindigkeit",  color:"#ec0016"},
+  {key:"signals",         label:"Signale & Zugsicherung", color:"#408335"},
+  {key:"electrification", label:"Elektrifizierung",       color:"#0c3992"},
+  {key:"gauge",           label:"Spurweite",              color:"#814997"}
+];
+const ormAttr = 'Bahndaten <a href="https://www.openrailwaymap.org" target="_blank">OpenRailwayMap</a>, © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>';
+const emptyFC = {type:"FeatureCollection",features:[]};
+const sources = {
+  sat:{type:"raster",tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],tileSize:256,maxzoom:19,attribution:"Bilder © Esri, Maxar, Earthstar Geographics"},
+  labels:{type:"raster",tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"],tileSize:256,maxzoom:19},
+  osm:{type:"raster",tiles:["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],tileSize:256,maxzoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'},
+  lines:{type:"geojson",data:emptyFC}
+};
+ORM.forEach(o=>sources["orm-"+o.key]={type:"raster",tiles:["a","b","c"].map(s=>`https://${s}.tiles.openrailwaymap.org/${o.key}/{z}/{x}/{y}.png`),tileSize:256,maxzoom:19,attribution:ormAttr});
+
+const view = store.get("sa_view2",{center:[10.45,51.16],zoom:5.5,bearing:0,pitch:0});
+const map = new maplibregl.Map({
+  container:"map",
+  style:{version:8,sources,layers:[
+    {id:"osm",type:"raster",source:"osm",layout:{visibility:"none"}},
+    {id:"sat",type:"raster",source:"sat",paint:{"raster-fade-duration":200}},
+    {id:"labels",type:"raster",source:"labels",layout:{visibility:"none"}},
+    ...ORM.map(o=>({id:"orm-"+o.key,type:"raster",source:"orm-"+o.key,layout:{visibility:"none"},paint:{"raster-fade-duration":200}})),
+    {id:"lines-casing",type:"line",source:"lines",layout:{"line-cap":"round","line-join":"round"},paint:{"line-color":"#ffffff","line-width":["interpolate",["linear"],["zoom"],8,4,16,10],"line-opacity":.9}},
+    {id:"lines",type:"line",source:"lines",layout:{"line-cap":"round","line-join":"round"},paint:{"line-color":["get","color"],"line-width":["interpolate",["linear"],["zoom"],8,2,16,6]}},
+    {id:"lines-hit",type:"line",source:"lines",paint:{"line-color":"#000","line-width":22,"line-opacity":0}}
+  ]},
+  center:view.center, zoom:view.zoom, bearing:view.bearing||0, pitch:view.pitch||0,
+  maxPitch:60, attributionControl:{compact:true}, dragRotate:true, touchPitch:true
+});
+map.touchZoomRotate.enableRotation();
+map.on("moveend",()=>store.set("sa_view2",{center:map.getCenter().toArray(),zoom:map.getZoom(),bearing:map.getBearing(),pitch:map.getPitch()}));
+
+/* Kompass dreht sich mit, Tippen richtet nach Norden aus */
+const compassIcon=$("#compassIcon");
+const updCompass=()=>compassIcon.style.transform=`rotate(${-map.getBearing()}deg)`;
+map.on("rotate",updCompass); map.on("load",updCompass);
+$("#btnCompass").onclick=()=>map.easeTo({bearing:0,pitch:0,duration:600});
+
+const setVis=(id,on)=>map.getLayer(id)&&map.setLayoutProperty(id,"visibility",on?"visible":"none");
+function setBase(v){
+  setVis("osm",v==="osm"); setVis("sat",v!=="osm"); setVis("labels",v==="satlab"); store.set("sa_base",v);
+}
+const savedBase = store.get("sa_base","sat");
+document.querySelector(`input[name=base][value=${savedBase}]`).checked = true;
+document.querySelectorAll("input[name=base]").forEach(r=>r.addEventListener("change",e=>setBase(e.target.value)));
+
+const ormState = store.get("sa_orm",Object.fromEntries(ORM.map(o=>[o.key,!!o.def])));
+const toggle = (attr,val,on) => `<span class="toggle"><input type="checkbox" ${attr}="${val}" ${on?"checked":""}><i></i></span>`;
+$("#ormList").innerHTML = ORM.map(o=>`<label class="opt"><span class="swatch" style="background:${o.color}"></span><span class="lbl">${o.label}</span>${toggle("data-orm",o.key,ormState[o.key])}</label>`).join("");
+const applyOrm=()=>{ORM.forEach(o=>setVis("orm-"+o.key,ormState[o.key]));store.set("sa_orm",ormState);};
+$("#ormList").addEventListener("change",e=>{const k=e.target.dataset.orm;if(k){ormState[k]=e.target.checked;applyOrm();}});
+
+map.on("load",()=>{setBase(savedBase);applyOrm();updateLinesSource();});
+
+/* ============ STRECKEN EINZELN (Overpass) ============ */
+const lines = new Map();
+const lineOff = store.get("sa_lines_off",{});
+function colorFor(s){let h=0;for(const c of String(s))h=(h*31+c.charCodeAt(0))%360;return `hsl(${h} 80% 52%)`;}
+function updateLinesSource(){
+  const src=map.getSource("lines"); if(!src) return;
+  src.setData({type:"FeatureCollection",features:[...lines.values()].filter(l=>l.on).map(l=>l.feature)});
+}
+async function loadLines(){
+  if(map.getZoom()<9){toast("Bitte näher heranzoomen, etwa auf eine Region");return;}
+  const b=map.getBounds(), btn=$("#btnLoadLines");
+  const q=`[out:json][timeout:40];relation["route"="railway"](${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()});out geom;`;
+  btn.disabled=true; btn.textContent="Strecken werden geladen …";
+  try{
+    const r = await fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:"data="+encodeURIComponent(q)});
+    if(!r.ok) throw new Error(r.status===429||r.status===504?"Der Streckenserver ist gerade ausgelastet. Bitte gleich noch einmal versuchen.":"Laden fehlgeschlagen ("+r.status+")");
+    const j = await r.json(); let neu=0;
+    for(const rel of j.elements){
+      if(lines.has(rel.id)) continue;
+      const segs=(rel.members||[]).filter(m=>m.type==="way"&&m.geometry).map(m=>m.geometry.map(p=>[p.lon,p.lat]));
+      if(!segs.length) continue;
+      const ref=rel.tags?.ref||"–", name=rel.tags?.name||rel.tags?.description||"Strecke", color=colorFor(ref+name);
+      lines.set(rel.id,{id:rel.id,ref,name,color,on:!lineOff[rel.id],
+        feature:{type:"Feature",properties:{id:rel.id,ref,name,color},geometry:{type:"MultiLineString",coordinates:segs}}});
+      neu++;
+    }
+    updateLinesSource(); renderLines();
+    toast(neu?`${neu} Strecken geladen`:"Keine neuen Strecken in diesem Ausschnitt");
+  }catch(e){toast(e.message||"Laden fehlgeschlagen");}
+  finally{btn.disabled=false;btn.textContent="Strecken im Ausschnitt laden";}
+}
+function renderLines(){
+  const f=$("#lineFilter").value.trim().toLowerCase();
+  const arr=[...lines.values()].filter(l=>!f||(l.ref+" "+l.name).toLowerCase().includes(f))
+    .sort((a,b)=>(parseInt(a.ref)||99999)-(parseInt(b.ref)||99999)||a.name.localeCompare(b.name));
+  $("#linesHint").hidden=lines.size>0; $("#linesBox").hidden=lines.size===0;
+  $("#lineList").innerHTML = arr.length ? arr.map(l=>`<label class="opt"><span class="swatch" style="background:${l.color}"></span><span class="ref">${esc(l.ref)}</span><span class="lbl"><span class="lname">${esc(l.name)}</span></span>${toggle("data-line",l.id,l.on)}</label>`).join("")
+    : `<div class="opt"><span class="hint">Keine Strecke passt zur Suche.</span></div>`;
+}
+const saveLineOff=()=>{lines.forEach(l=>{if(l.on) delete lineOff[l.id]; else lineOff[l.id]=true;});store.set("sa_lines_off",lineOff);};
+$("#lineList").addEventListener("change",e=>{const l=lines.get(+e.target.dataset.line);if(l){l.on=e.target.checked;updateLinesSource();saveLineOff();}});
+$("#btnLoadLines").onclick=loadLines;
+$("#lineFilter").oninput=renderLines;
+$("#btnAllOn").onclick=()=>{lines.forEach(l=>l.on=true);updateLinesSource();saveLineOff();renderLines();};
+$("#btnAllOff").onclick=()=>{lines.forEach(l=>l.on=false);updateLinesSource();saveLineOff();renderLines();};
+map.on("click","lines-hit",e=>{
+  if(addMode||e.originalEvent.__handled) return;
+  const p=e.features[0].properties; e.originalEvent.__handled=true;
+  new maplibregl.Popup({offset:8,maxWidth:"260px"}).setLngLat(e.lngLat)
+    .setHTML(`<div class="pop"><span class="t"><span class="swatch" style="background:${p.color}"></span>Strecke</span><h4>${esc(p.ref)}</h4><p>${esc(p.name)}</p></div>`).addTo(map);
+});
+map.on("mouseenter","lines-hit",()=>map.getCanvas().style.cursor="pointer");
+map.on("mouseleave","lines-hit",()=>map.getCanvas().style.cursor="");
+
+/* ============ OBJEKTE ============ */
+let me=null, markers=[], profiles={}, mapMarkers=[];
+const typeOn = store.get("sa_types",Object.fromEntries(Object.keys(TYPES).map(k=>[k,true])));
+const pinSvg = t => `<svg viewBox="0 0 34 44"><path d="M17 43C17 43 3 27.5 3 17a14 14 0 0 1 28 0c0 10.5-14 26-14 26z" fill="${t.color}" stroke="#fff" stroke-width="2.5"/><text x="17" y="21" text-anchor="middle">${esc(t.short)}</text></svg>`;
+function pinEl(typ,extra=""){const el=document.createElement("div");el.className="mk "+extra;el.innerHTML=pinSvg(TYPES[typ]||TYPES.sonst);return el;}
+
+$("#typePick").innerHTML = Object.entries(TYPES).map(([k,t],i)=>`<label><input type="radio" name="typ" value="${k}" id="typ-${k}" ${i===0?"checked":""}><span class="tag" style="background:${t.color}">${t.short}</span>${t.label}</label>`).join("");
+const pickedType=()=>document.querySelector("input[name=typ]:checked").value;
+
+function renderTypeList(){
+  const counts={}; markers.forEach(m=>counts[m.typ]=(counts[m.typ]||0)+1);
+  $("#typeList").innerHTML = Object.entries(TYPES).map(([k,t])=>`<label class="opt"><span class="tag" style="background:${t.color}">${t.short}</span><span class="lbl">${t.label}</span><small>${counts[k]||0}</small>${toggle("data-type",k,typeOn[k]!==false)}</label>`).join("");
+}
+$("#typeList").addEventListener("change",e=>{const k=e.target.dataset.type;if(k){typeOn[k]=e.target.checked;store.set("sa_types",typeOn);drawMarkers();}});
+
+const canDelete = m => me && (m.created_by===me.id || me.role==="admin");
+function popupHtml(m){const t=TYPES[m.typ]||TYPES.sonst;const who=profiles[m.created_by]?.name||"Unbekannt";
+  return `<div class="pop"><span class="t"><span class="tag" style="background:${t.color}">${esc(t.short)}</span>${esc(t.label)}</span><h4>${esc(m.titel)}</h4>
+  ${m.notiz?`<p>${esc(m.notiz).replace(/\n/g,"<br>")}</p>`:""}
+  <p class="meta">Erfasst von ${esc(who)} am ${fmtDate(m.created_at)}<br>${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}</p>
+  ${canDelete(m)?`<button class="btn danger block" data-del="${esc(m.id)}">Entfernen</button>`:""}</div>`;}
+function drawMarkers(){
+  mapMarkers.forEach(mm=>mm.remove()); mapMarkers=[];
+  markers.filter(m=>typeOn[m.typ]!==false).forEach(m=>{
+    const popup=new maplibregl.Popup({offset:[0,-40],maxWidth:"290px"}).setHTML(popupHtml(m));
+    popup.on("open",()=>{
+      const b=popup.getElement().querySelector("[data-del]"); if(!b) return;
+      b.onclick=async()=>{
+        if(!b.classList.contains("armed")){b.classList.add("armed");b.textContent="Wirklich entfernen?";vibrate(15);return;}
+        b.disabled=true;
+        try{await api.deleteMarker(m.id);popup.remove();toast("Objekt entfernt");await refreshMarkers();}
+        catch(err){toast(err.message||"Entfernen fehlgeschlagen");b.disabled=false;}
+      };
+    });
+    const el=pinEl(m.typ); el.title=m.titel;
+    el.addEventListener("click",ev=>ev.stopPropagation());
+    mapMarkers.push(new maplibregl.Marker({element:el,anchor:"bottom"}).setLngLat([m.lng,m.lat]).setPopup(popup).addTo(map));
+  });
+  renderTypeList();
+}
+async function refreshMarkers(){
+  try{
+    markers = await api.listMarkers();
+    const ps = await api.listProfiles(); profiles = Object.fromEntries(ps.map(p=>[p.id,p]));
+    drawMarkers();
+  }catch(e){toast("Objekte konnten nicht geladen werden: "+e.message);}
+}
+
+/* Hinzufügen */
+let addMode=false, pending=null, tempMarker=null;
+function setAddMode(on){addMode=on;$("#addBanner").classList.toggle("on",on);map.getCanvas().style.cursor=on?"crosshair":"";}
+$("#btnAdd").onclick=()=>{closeSheets();setAddMode(!addMode);vibrate(10);};
+$("#addCancel").onclick=()=>setAddMode(false);
+map.on("click",e=>{
+  if(!addMode) return; setAddMode(false); pending=e.lngLat; vibrate(20);
+  tempMarker&&tempMarker.remove();
+  tempMarker=new maplibregl.Marker({element:pinEl(pickedType(),"temp"),anchor:"bottom",draggable:true}).setLngLat(pending).addTo(map);
+  tempMarker.on("dragend",()=>{pending=tempMarker.getLngLat();showCoords();});
+  showCoords(); $("#addForm").reset(); document.querySelector("input[name=typ]").checked=true; tempMarker.getElement().innerHTML=pinSvg(TYPES[pickedType()]);
+  map.easeTo({center:pending,offset:[0,-window.innerHeight*0.22],duration:500});
+  openSheet("#sheetAdd");
+});
+function showCoords(){$("#addCoords").textContent=`Position ${pending.lat.toFixed(5)}, ${pending.lng.toFixed(5)} · Pin lässt sich verschieben`;}
+$("#typePick").addEventListener("change",()=>tempMarker&&(tempMarker.getElement().innerHTML=pinSvg(TYPES[pickedType()])));
+$("#addForm").onsubmit=async e=>{
+  e.preventDefault(); if(!pending) return;
+  const btn=$("#addSave"); btn.disabled=true;
+  try{
+    await api.addMarker({lat:pending.lat,lng:pending.lng,typ:pickedType(),titel:$("#fTitel").value.trim(),notiz:$("#fNotiz").value.trim()||null});
+    closeSheets(); vibrate(20); toast("Objekt gespeichert"); await refreshMarkers();
+  }catch(err){toast("Speichern fehlgeschlagen: "+err.message);}
+  finally{btn.disabled=false;}
+};
+
+/* Standort */
+let locMarker=null;
+$("#btnLocate").onclick=()=>{
+  if(!navigator.geolocation){toast("Dein Gerät unterstützt keine Standortabfrage");return;}
+  navigator.geolocation.getCurrentPosition(p=>{
+    const ll=[p.coords.longitude,p.coords.latitude];
+    if(!locMarker){const el=document.createElement("div");el.className="me-dot";locMarker=new maplibregl.Marker({element:el}).setLngLat(ll).addTo(map);}
+    else locMarker.setLngLat(ll);
+    map.flyTo({center:ll,zoom:Math.max(map.getZoom(),16),speed:1.6});
+  },()=>toast("Standort nicht verfügbar. Bitte im Browser erlauben."),{enableHighAccuracy:true,timeout:10000});
+};
+
+/* ============ Panels ============ */
+function closeSheets(){
+  document.querySelectorAll(".sheet.open").forEach(s=>s.classList.remove("open"));
+  $("#scrim").classList.remove("on");
+  if(tempMarker){tempMarker.remove();tempMarker=null;}
+}
+function openSheet(sel){
+  document.querySelectorAll(".sheet").forEach(s=>s.classList.toggle("open","#"+s.id===sel));
+  $("#scrim").classList.toggle("on", sel!=="#sheetAdd");
+}
+document.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",closeSheets));
+$("#scrim").onclick=closeSheets;
+$("#btnLayers").onclick=()=>{$("#sheetLayers").classList.contains("open")?closeSheets():openSheet("#sheetLayers");};
+$("#userChip").onclick=()=>{renderUserSheet();openSheet("#sheetUser");};
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeSheets();setAddMode(false);}});
+
+/* Sheet nach unten wischen zum Schließen */
+document.querySelectorAll(".sheet").forEach(sheet=>{
+  const handle=sheet.querySelector(".grab"), head=sheet.querySelector("header"); let y0=null,dy=0;
+  const start=e=>{y0=e.touches[0].clientY;dy=0;sheet.style.transition="none";};
+  const move=e=>{if(y0===null)return;dy=Math.max(0,e.touches[0].clientY-y0);sheet.style.transform=`translateY(${dy}px)`;};
+  const end=()=>{if(y0===null)return;sheet.style.transition="";sheet.style.transform="";if(dy>90)closeSheets();y0=null;};
+  [handle,head].forEach(h=>{h.addEventListener("touchstart",start,{passive:true});h.addEventListener("touchmove",move,{passive:true});h.addEventListener("touchend",end);});
+});
+
+async function renderUserSheet(){
+  if(api.demo){
+    $("#demoSwitch").hidden=false;
+    $("#demoUsers").innerHTML=api.users.map(u=>`<label class="opt"><span class="avatar">${esc(u.name[0])}</span><span class="lbl">${esc(u.name)}<br><small>${u.role==="admin"?"Admin":"Mitarbeiter"}</small></span><input type="radio" name="demoUser" value="${u.id}" ${u.id===me.id?"checked":""} style="accent-color:var(--red);width:20px;height:20px"></label>`).join("");
+    $("#demoUsers").onchange=async e=>{api.switchTo(e.target.value);await start();renderUserSheet();toast("Angemeldet als "+me.name);};
+  }
+  const isAdmin = me.role==="admin"; $("#teamBox").hidden=!isAdmin;
+  if(isAdmin){
+    const ps=await api.listProfiles();
+    $("#teamList").innerHTML=ps.map(p=>`<div class="opt"><span class="avatar">${esc((p.name||p.email||"?")[0].toUpperCase())}</span><span class="lbl"><span class="lname">${esc(p.name||p.email)}</span><small class="lname">${esc(p.email||"")}</small></span>
+      <select data-role="${p.id}" aria-label="Rolle von ${esc(p.name||p.email)}" ${p.id===me.id?"disabled":""} style="background:var(--grey-1);border:0;border-radius:8px;padding:8px;font-weight:600;font-size:14px">
+      ${["wartend","mitarbeiter","admin"].map(r=>`<option value="${r}" ${p.role===r?"selected":""}>${r==="wartend"?"Wartet":r==="admin"?"Admin":"Mitarbeiter"}</option>`).join("")}</select></div>`).join("");
+    $("#teamList").onchange=async e=>{const id=e.target.dataset.role;if(!id)return;
+      try{await api.setRole(id,e.target.value);toast("Rolle geändert");await refreshMarkers();}catch(err){toast("Ändern fehlgeschlagen: "+err.message);}};
+  }
+  $("#btnLogout").hidden=api.demo;
+}
+
+/* ============ Anmeldung & Start ============ */
+let authMode="in";
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{
+  authMode=b.dataset.mode; document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",x===b));
+  $("#nameField").hidden=authMode!=="up"; $("#authBtn").textContent=authMode==="up"?"Konto anlegen":"Anmelden";
+  $("#btnForgot").hidden=authMode==="up"||api.demo; $("#authErr").textContent="";
+});
+$("#authForm").onsubmit=async e=>{
+  e.preventDefault(); const err=$("#authErr"); err.textContent=""; err.classList.remove("ok"); const btn=$("#authBtn"); btn.disabled=true;
+  try{
+    if(authMode==="up"){await api.signUp($("#aMail").value.trim(),$("#aPw").value,$("#aName").value.trim());
+      err.classList.add("ok"); err.textContent="Konto angelegt. Falls eine Bestätigungs-Mail kommt, bitte den Link öffnen und dann anmelden.";}
+    else {await api.signIn($("#aMail").value.trim(),$("#aPw").value);}
+    await start();
+  }catch(e2){err.textContent=/Invalid login/i.test(e2.message)?"E-Mail oder Passwort stimmt nicht.":/not confirmed/i.test(e2.message)?"Bitte bestätige zuerst deine E-Mail-Adresse über den Link in der Mail.":e2.message;}
+  finally{btn.disabled=false;}
+};
+$("#btnForgot").hidden = api.demo;
+$("#btnForgot").onclick=async()=>{
+  const err=$("#authErr"), mail=$("#aMail").value.trim(); err.classList.remove("ok");
+  if(!mail){err.textContent="Bitte zuerst oben deine E-Mail eintragen.";$("#aMail").focus();return;}
+  try{await api.resetPassword(mail);err.classList.add("ok");err.textContent="Mail ist unterwegs. Öffne den Link darin und vergib ein neues Passwort.";}
+  catch(e){err.textContent=/rate|seconds/i.test(e.message)?"Bitte kurz warten und es dann erneut versuchen.":e.message;}
+};
+let recovering=false;
+if(api.onRecovery) api.onRecovery(()=>{recovering=true;$("#resetGate").hidden=false;$("#gate").hidden=true;$("#pending").hidden=true;});
+$("#resetForm").onsubmit=async e=>{
+  e.preventDefault(); const err=$("#resetErr");
+  if($("#rPw").value!==$("#rPw2").value){err.textContent="Die beiden Passwörter sind nicht gleich.";return;}
+  const btn=$("#resetBtn"); btn.disabled=true;
+  try{await api.updatePassword($("#rPw").value);recovering=false;$("#resetGate").hidden=true;history.replaceState(null,"",location.pathname);toast("Passwort geändert");await start();}
+  catch(e2){err.textContent=e2.message;}
+  finally{btn.disabled=false;}
+};
+async function logout(){await api.signOut();me=null;markers=[];mapMarkers.forEach(m=>m.remove());mapMarkers=[];closeSheets();await start();}
+$("#btnLogout").onclick=logout; $("#btnLogout2").onclick=logout; $("#btnRecheck").onclick=()=>start();
+
+let subscribed=false;
+async function start(){
+  me = await api.me();
+  if(recovering) return;
+  $("#gate").hidden = !!me; $("#pending").hidden = !(me && me.role==="wartend");
+  const active = me && me.role!=="wartend";
+  $("#fabs").hidden=!active; $("#userChip").hidden=!active;
+  if(!active) return;
+  $("#userName").textContent=me.name; $("#userAvatar").textContent=(me.name||"?")[0].toUpperCase();
+  $("#userRole").textContent=me.role==="admin"?"Admin":"Mitarbeiter"; $("#userRole").className=me.role==="admin"?"admin":"";
+  await refreshMarkers();
+  if(!subscribed){api.subscribe(()=>refreshMarkers());subscribed=true;}
+  if(api.demo && !store.get("sa_demo_seen",false)){store.set("sa_demo_seen",true);toast("Demo-Modus: Daten bleiben nur auf diesem Gerät");}
+}
+start();
+</script>
+</body>
+</html>
