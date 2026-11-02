@@ -259,7 +259,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
   <div class="body">
     <details class="group fold" data-fold="base" open><summary><h3>Kartengrundlage</h3><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="foldbody">
       <div class="seg">
-        <label><input type="radio" name="base" value="sat" id="baseSat">Satellit</label>
+        <label><input type="radio" name="base" value="sat" id="baseSat">Luftbild</label>
         <label><input type="radio" name="base" value="satlab" id="baseSatLab">Mit Orten</label>
         <label><input type="radio" name="base" value="osm" id="baseOsm">Straße</label>
       </div>
@@ -479,6 +479,8 @@ const ormAttr = 'Bahndaten <a href="https://www.openrailwaymap.org" target="_bla
 const emptyFC = {type:"FeatureCollection",features:[]};
 const sources = {
   sat:{type:"raster",tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],tileSize:256,maxzoom:19,attribution:"Bilder © Esri, Maxar, Earthstar Geographics"},
+  dop:{type:"raster",tiles:["https://geoservices.bayern.de/od/wms/dop/v1/dop20?service=WMS&request=GetMap&version=1.1.1&layers=by_dop20c&styles=&format=image/jpeg&srs=EPSG:3857&bbox={bbox-epsg-3857}&width=512&height=512"],
+    tileSize:256,minzoom:11,maxzoom:20,bounds:[8.9,47.2,13.9,50.6],attribution:'Luftbild © <a href="https://geodaten.bayern.de" target="_blank">Bayerische Vermessungsverwaltung</a>, CC BY 4.0'},
   labels:{type:"raster",tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"],tileSize:256,maxzoom:19},
   osm:{type:"raster",tiles:["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],tileSize:256,maxzoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'},
   lines:{type:"geojson",data:emptyFC},
@@ -493,6 +495,7 @@ const map = new maplibregl.Map({
   style:{version:8,glyphs:"https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",sources,layers:[
     {id:"osm",type:"raster",source:"osm",layout:{visibility:"none"}},
     {id:"sat",type:"raster",source:"sat",paint:{"raster-fade-duration":200}},
+    {id:"dop",type:"raster",source:"dop",minzoom:11,paint:{"raster-fade-duration":250}},
     {id:"labels",type:"raster",source:"labels",layout:{visibility:"none"}},
     ...ORM.map(o=>({id:"orm-"+o.key,type:"raster",source:"orm-"+o.key,layout:{visibility:"none"},paint:{"raster-fade-duration":200}})),
     {id:"lines-casing",type:"line",source:"lines",layout:{"line-cap":"round","line-join":"round"},paint:{"line-color":"#ffffff","line-width":["interpolate",["linear"],["zoom"],8,4,16,10],"line-opacity":.9}},
@@ -536,7 +539,7 @@ $("#btnCompass").onclick=()=>map.easeTo({bearing:0,pitch:0,duration:600});
 
 const setVis=(id,on)=>map.getLayer(id)&&map.setLayoutProperty(id,"visibility",on?"visible":"none");
 function setBase(v){
-  setVis("osm",v==="osm"); setVis("sat",v!=="osm"); setVis("labels",v==="satlab"); store.set("sa_base",v);
+  setVis("osm",v==="osm"); setVis("sat",v!=="osm"); setVis("dop",v!=="osm"); setVis("labels",v==="satlab"); store.set("sa_base",v);
 }
 const savedBase = store.get("sa_base","sat");
 document.querySelector(`input[name=base][value=${savedBase}]`).checked = true;
