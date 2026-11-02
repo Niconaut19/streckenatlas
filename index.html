@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#ffffff">
+<script>try{document.documentElement.dataset.theme=JSON.parse(localStorage.getItem("sa_theme"))||"light";}catch(e){document.documentElement.dataset.theme="light";}</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Streckenatlas</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -23,9 +24,29 @@
   --grey-1:#f0f3f5; --grey-2:#d7dce1; --white:#ffffff;
   --green:#408335; --blue:#0c3992;
   --sans:"Open Sans","Helvetica Neue",Arial,system-ui,sans-serif;
+  --inv-bg:#282d37; --inv-fg:#ffffff; --scrim:rgba(40,45,55,.25);
   --r:12px; --shadow:0 2px 6px rgba(40,45,55,.12),0 8px 24px rgba(40,45,55,.14);
   --ease:cubic-bezier(.2,.8,.2,1);
 }
+/* Dunkelmodus: per Einstellung (data-theme) oder automatisch nach Handy-Einstellung */
+:root[data-theme="dark"]{
+  --red:#ff3344; --red-dark:#e0182a; --red-soft:#3d1a1f;
+  --ink:#eef1f4; --ink-2:#c9cfd6; --muted:#9aa3ad;
+  --grey-1:#262b33; --grey-2:#3a414c; --white:#1a1e24;
+  --green:#5cb85c; --blue:#5d8bff;
+  --inv-bg:#eef1f4; --inv-fg:#14181d; --scrim:rgba(0,0,0,.45);
+  --shadow:0 2px 6px rgba(0,0,0,.35),0 8px 24px rgba(0,0,0,.45);
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: dark){ :root[data-theme="auto"]{
+  --red:#ff3344; --red-dark:#e0182a; --red-soft:#3d1a1f;
+  --ink:#eef1f4; --ink-2:#c9cfd6; --muted:#9aa3ad;
+  --grey-1:#262b33; --grey-2:#3a414c; --white:#1a1e24;
+  --green:#5cb85c; --blue:#5d8bff;
+  --inv-bg:#eef1f4; --inv-fg:#14181d; --scrim:rgba(0,0,0,.45);
+  --shadow:0 2px 6px rgba(0,0,0,.35),0 8px 24px rgba(0,0,0,.45);
+  color-scheme:dark;
+}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;margin:0;background:var(--grey-1);color:var(--ink);font:15px/1.45 var(--sans);overscroll-behavior:none}
 button,input,select,textarea{font:inherit;color:inherit}
@@ -72,15 +93,15 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 /* Hinweis im Setzmodus */
 .banner{position:fixed;z-index:25;left:50%;top:calc(env(safe-area-inset-top,0px) + 66px);
   transform:translate(-50%,-20px);opacity:0;pointer-events:none;transition:all .3s var(--ease);
-  background:var(--ink);color:#fff;border-radius:999px;padding:6px 6px 6px 16px;display:flex;gap:12px;align-items:center;
+  background:var(--inv-bg);color:var(--inv-fg);border-radius:999px;padding:6px 6px 6px 16px;display:flex;gap:12px;align-items:center;
   font-weight:600;font-size:14px;box-shadow:var(--shadow);max-width:calc(100% - 24px)}
 .banner.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}
-.banner button{background:#fff;color:var(--ink);border:0;border-radius:999px;padding:6px 12px;font-weight:700;cursor:pointer}
+.banner button{background:var(--inv-fg);color:var(--inv-bg);border:0;border-radius:999px;padding:6px 12px;font-weight:700;cursor:pointer}
 .crosshair{position:fixed;z-index:15;left:50%;top:50%;width:0;height:0;pointer-events:none;opacity:0;transition:opacity .2s}
 .crosshair.on{opacity:1}
 
 /* Bottom-Sheets */
-.scrim{position:fixed;inset:0;z-index:29;background:rgba(40,45,55,.25);opacity:0;pointer-events:none;transition:opacity .3s}
+.scrim{position:fixed;inset:0;z-index:29;background:var(--scrim);opacity:0;pointer-events:none;transition:opacity .3s}
 .scrim.on{opacity:1;pointer-events:auto}
 .sheet{position:fixed;z-index:30;background:var(--white);display:flex;flex-direction:column;
   left:0;right:0;bottom:0;max-height:82%;border-radius:20px 20px 0 0;box-shadow:0 -6px 30px rgba(40,45,55,.2);
@@ -230,7 +251,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .nearby .x{width:32px;height:32px;flex:none}
 .toast{position:fixed;z-index:60;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);
   transform:translate(-50%,20px);opacity:0;transition:all .3s var(--ease);pointer-events:none;
-  background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-weight:600;max-width:calc(100% - 110px);text-align:center;box-shadow:var(--shadow)}
+  background:var(--inv-bg);color:var(--inv-fg);padding:12px 18px;border-radius:12px;font-weight:600;max-width:calc(100% - 110px);text-align:center;box-shadow:var(--shadow)}
 .toast.on{opacity:1;transform:translate(-50%,0)}
 
 /* Marker */
@@ -256,7 +277,16 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .pop h4{margin:4px 0 2px;font-size:18px;font-weight:800;padding-right:20px}
 .pop p{margin:8px 0}
 .pop .meta{color:var(--muted);font-size:12.5px;border-top:1px solid var(--grey-1);padding-top:8px}
-.maplibregl-ctrl-attrib{font-size:10px;background:rgba(255,255,255,.8)!important}
+.maplibregl-ctrl-attrib{font-size:10px;background:color-mix(in srgb,var(--white) 85%,transparent)!important;color:var(--ink)}
+.maplibregl-ctrl-attrib a{color:var(--ink)!important}
+.maplibregl-ctrl-attrib-button{filter:var(--icon-filter,none)}
+:root[data-theme="dark"]{--icon-filter:invert(1)}
+@media (prefers-color-scheme: dark){:root[data-theme="auto"]{--icon-filter:invert(1)}}
+.maplibregl-popup-content{background:var(--white);color:var(--ink)}
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip{border-top-color:var(--white)}
+.maplibregl-popup-anchor-top .maplibregl-popup-tip,.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,.maplibregl-popup-anchor-top-right .maplibregl-popup-tip{border-bottom-color:var(--white)}
+.maplibregl-popup-anchor-left .maplibregl-popup-tip{border-right-color:var(--white)}
+.maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color:var(--white)}
 .maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right{bottom:env(safe-area-inset-bottom,0px)}
 .maplibregl-ctrl-bottom-left{left:env(safe-area-inset-left,0px)}
 .maplibregl-ctrl-attrib.maplibregl-compact{margin:0 0 14px 12px}
@@ -355,6 +385,14 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
       </div>
       <h3 style="margin-top:14px">Bei diesen Arten</h3>
       <div class="list" id="nbTypes"></div>
+    </div>
+    <div class="group"><h3>Darstellung</h3>
+      <div class="seg" id="themeSeg">
+        <label><input type="radio" name="theme" value="light" id="thLight">Hell</label>
+        <label><input type="radio" name="theme" value="dark" id="thDark">Dunkel</label>
+        <label><input type="radio" name="theme" value="auto" id="thAuto">Automatisch</label>
+      </div>
+      <p class="hint" style="margin-top:8px">„Automatisch“ folgt der Einstellung deines Handys.</p>
     </div>
     <button class="btn block" id="btnTour">Einführung ansehen</button>
     <button class="btn block" id="btnLogout">Abmelden</button>
@@ -640,6 +678,20 @@ $("#btnReload").onclick=()=>{
   setTimeout(()=>location.replace(location.pathname+"?v="+Date.now()),250);
 };
 if(location.search.includes("v=")) history.replaceState(null,"",location.pathname+location.hash);
+
+/* Darstellung Hell / Dunkel / Automatisch */
+function applyTheme(v){
+  document.documentElement.dataset.theme=v;
+  const dark=v==="dark"||(v==="auto"&&matchMedia("(prefers-color-scheme: dark)").matches);
+  document.querySelector('meta[name="theme-color"]').content=dark?"#1a1e24":"#ffffff";
+  if(map.getLayer&&map.getLayer("osm")) map.setPaintProperty("osm","raster-brightness-max",dark?0.75:1);
+}
+const themeNow=store.get("sa_theme","light");
+document.querySelector(`input[name=theme][value="${themeNow}"]`).checked=true;
+applyTheme(themeNow);
+map.on("load",()=>applyTheme(store.get("sa_theme","light")));
+document.querySelectorAll("input[name=theme]").forEach(r=>r.onchange=e=>{store.set("sa_theme",e.target.value);applyTheme(e.target.value);});
+matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",()=>{if(store.get("sa_theme","light")==="auto")applyTheme("auto");});
 
 /* Aufklappbare Bereiche merken */
 const folds=store.get("sa_folds",{});
