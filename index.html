@@ -177,13 +177,20 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .toast.on{opacity:1;transform:translate(-50%,0)}
 
 /* Marker */
-.mk{width:34px;height:44px;cursor:pointer;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));transition:transform .2s var(--ease);transform-origin:50% 100%}
+.mk{width:34px;height:44px;cursor:pointer;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;touch-action:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));transition:transform .2s var(--ease);transform-origin:50% 100%}
 .mk:hover{transform:scale(1.1)}
 .mk svg{display:block;width:34px;height:44px}
 .mk text{font:800 11px var(--sans);fill:#fff}
 .mk.temp{animation:drop .35s var(--ease)}
 @keyframes drop{from{transform:translateY(-30px);opacity:0}to{transform:none;opacity:1}}
-.me-dot{width:20px;height:20px;border-radius:50%;background:var(--blue);border:3px solid #fff;box-shadow:0 0 0 6px rgba(12,57,146,.2),0 2px 4px rgba(0,0,0,.3)}
+.mk.pressing{transform:scale(1.25);transition:transform .6s linear}
+.mk.pressing svg path{stroke:var(--red)}
+.me{position:relative;width:20px;height:20px}
+.me-dot{position:absolute;inset:0;border-radius:50%;background:#1a73e8;border:3px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,.35)}
+.me-acc{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;background:rgba(26,115,232,.18);border:1px solid rgba(26,115,232,.35);transition:width .6s,height .6s;pointer-events:none}
+.me-head{position:absolute;left:50%;top:-14px;transform:translateX(-50%);width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:14px solid #1a73e8}
+.fab.active{color:#1a73e8}
+.fab.active svg{fill:#1a73e8}
 
 /* Popups */
 .maplibregl-popup-content{border-radius:14px;padding:16px 18px 14px;box-shadow:var(--shadow);font:14px/1.45 var(--sans);color:var(--ink);min-width:220px}
@@ -240,6 +247,11 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
         <div class="field search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="lineFilter" placeholder="Nummer oder Name suchen" aria-label="Strecken suchen"></div>
         <div class="row"><button class="btn" id="btnAllOn">Alle an</button><button class="btn" id="btnAllOff">Alle aus</button></div>
         <div class="list" id="lineList"></div>
+        <div class="list">
+          <label class="opt"><span class="lbl">Nur Objekte an eingeschalteten Strecken<br><small>Gilt, sobald mindestens eine Strecke an ist</small></span><span class="toggle"><input type="checkbox" id="lineFilterToggle"><i></i></span></label>
+          <label class="opt"><span class="lbl">Abstand zur Strecke</span><select id="lineRadius" style="background:var(--grey-1);border:0;border-radius:8px;padding:8px;font-weight:600"><option value="100">bis 100 m</option><option value="300">bis 300 m</option><option value="1000">bis 1 km</option></select></label>
+        </div>
+        <p class="hint" id="lineFilterInfo"></p>
       </div>
     </div>
     <div class="group"><h3>Erfasste Objekte</h3><div class="list" id="typeList"></div></div>
@@ -307,6 +319,16 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
     <p class="hint">Dein Konto ist angelegt. Ein Admin muss es noch freischalten, danach siehst du die Karte.</p>
     <button class="btn primary block" id="btnRecheck">Erneut prüfen</button>
     <button class="btn block" id="btnLogout2">Abmelden</button>
+  </div>
+</div>
+
+<div class="modal" id="confirmDel" hidden role="dialog" aria-modal="true" aria-labelledby="dHead">
+  <div class="card">
+    <h2 id="dHead">Objekt entfernen?</h2>
+    <div class="csum"><span class="tag" id="dTag"></span><div><b id="dTitle"></b><small id="dType"></small></div></div>
+    <p class="hint">Das Objekt verschwindet für alle. Das lässt sich nicht rückgängig machen.</p>
+    <button class="btn primary block" id="dYes">Ja, entfernen</button>
+    <button class="btn block" id="dBack">Abbrechen</button>
   </div>
 </div>
 
@@ -463,6 +485,7 @@ map.on("load",()=>{setBase(savedBase);applyOrm();updateLinesSource();});
 /* ============ STRECKEN EINZELN (Overpass) ============ */
 const lines = new Map();
 const lineOff = store.get("sa_lines_off",{});
+let lineFilterOn = store.get("sa_linefilter",true), lineFilterRadius = store.get("sa_lineradius","300");
 function colorFor(s){let h=0;for(const c of String(s))h=(h*31+c.charCodeAt(0))%360;return `hsl(${h} 80% 52%)`;}
 function updateLinesSource(){
   const src=map.getSource("lines"); if(!src) return;
@@ -486,7 +509,7 @@ async function loadLines(){
         feature:{type:"Feature",properties:{id:rel.id,ref,name,color},geometry:{type:"MultiLineString",coordinates:segs}}});
       neu++;
     }
-    updateLinesSource(); renderLines();
+    updateLinesSource(); renderLines(); drawMarkers();
     toast(neu?`${neu} Strecken geladen`:"Keine neuen Strecken in diesem Ausschnitt");
   }catch(e){toast(e.message||"Laden fehlgeschlagen");}
   finally{btn.disabled=false;btn.textContent="Strecken im Ausschnitt laden";}
@@ -500,11 +523,14 @@ function renderLines(){
     : `<div class="opt"><span class="hint">Keine Strecke passt zur Suche.</span></div>`;
 }
 const saveLineOff=()=>{lines.forEach(l=>{if(l.on) delete lineOff[l.id]; else lineOff[l.id]=true;});store.set("sa_lines_off",lineOff);};
-$("#lineList").addEventListener("change",e=>{const l=lines.get(+e.target.dataset.line);if(l){l.on=e.target.checked;updateLinesSource();saveLineOff();}});
+$("#lineList").addEventListener("change",e=>{const l=lines.get(+e.target.dataset.line);if(l){l.on=e.target.checked;updateLinesSource();saveLineOff();drawMarkers();}});
+$("#lineFilterToggle").checked=lineFilterOn; $("#lineRadius").value=lineFilterRadius;
+$("#lineFilterToggle").onchange=e=>{lineFilterOn=e.target.checked;store.set("sa_linefilter",lineFilterOn);drawMarkers();};
+$("#lineRadius").onchange=e=>{lineFilterRadius=e.target.value;store.set("sa_lineradius",lineFilterRadius);drawMarkers();};
 $("#btnLoadLines").onclick=loadLines;
 $("#lineFilter").oninput=renderLines;
-$("#btnAllOn").onclick=()=>{lines.forEach(l=>l.on=true);updateLinesSource();saveLineOff();renderLines();};
-$("#btnAllOff").onclick=()=>{lines.forEach(l=>l.on=false);updateLinesSource();saveLineOff();renderLines();};
+$("#btnAllOn").onclick=()=>{lines.forEach(l=>l.on=true);updateLinesSource();saveLineOff();renderLines();drawMarkers();};
+$("#btnAllOff").onclick=()=>{lines.forEach(l=>l.on=false);updateLinesSource();saveLineOff();renderLines();drawMarkers();};
 map.on("click","lines-hit",e=>{
   if(addMode||e.originalEvent.__handled) return;
   const p=e.features[0].properties; e.originalEvent.__handled=true;
@@ -545,25 +571,72 @@ function popupHtml(m){const t=TYPES[m.typ]||TYPES.sonst;const who=profiles[m.cre
   return `<div class="pop"><span class="t"><span class="tag" style="background:${t.color}">${esc(t.short)}</span>${esc(t.label)}</span><h4>${esc(m.titel)}</h4>
   ${m.notiz?`<p>${esc(m.notiz).replace(/\n/g,"<br>")}</p>`:""}
   ${navLinks(m)}
-  <p class="meta">Erfasst von ${esc(who)} am ${fmtDate(m.created_at)}<br>${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}</p>
-  ${canDelete(m)?`<button class="btn danger block" data-del="${esc(m.id)}">Entfernen</button>`:""}</div>`;}
+  <p class="meta">Erfasst von ${esc(who)} am ${fmtDate(m.created_at)}<br>${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}${canDelete(m)?"<br>Zum Entfernen den Pin lange drücken.":""}</p></div>`;}
+
+/* Abstand Punkt–Strecke in Metern (für den Streckenfilter) */
+function distToLineM(lat,lng,coords){
+  const k=111320, kx=k*Math.cos(lat*Math.PI/180); let best=Infinity;
+  for(const seg of coords){
+    for(let i=1;i<seg.length;i++){
+      const ax=(seg[i-1][0]-lng)*kx, ay=(seg[i-1][1]-lat)*k, bx=(seg[i][0]-lng)*kx, by=(seg[i][1]-lat)*k;
+      const dx=bx-ax, dy=by-ay, L=dx*dx+dy*dy;
+      let t=L?-(ax*dx+ay*dy)/L:0; t=Math.max(0,Math.min(1,t));
+      const px=ax+t*dx, py=ay+t*dy, d=Math.hypot(px,py); if(d<best) best=d;
+    }
+  }
+  return best;
+}
+function lineFilterActive(){return lineFilterOn && [...lines.values()].some(l=>l.on);}
+function nearOnLine(m){
+  const r=+lineFilterRadius;
+  for(const l of lines.values()){ if(l.on && distToLineM(m.lat,m.lng,l.feature.geometry.coordinates)<=r) return true; }
+  return false;
+}
+
+/* Langes Drücken = Löschen (nur Admin), kurzes Tippen = Infos */
+function attachPress(el,m,onTap){
+  let timer=null, fired=false, x0=0, y0=0;
+  const cancel=()=>{clearTimeout(timer);timer=null;el.classList.remove("pressing");};
+  el.addEventListener("pointerdown",e=>{
+    fired=false; x0=e.clientX; y0=e.clientY; el.classList.add("pressing");
+    timer=setTimeout(()=>{timer=null;fired=true;el.classList.remove("pressing");vibrate(30);onLongPress(m);},600);
+  });
+  el.addEventListener("pointermove",e=>{if(timer&&Math.hypot(e.clientX-x0,e.clientY-y0)>10)cancel();});
+  el.addEventListener("pointerup",cancel); el.addEventListener("pointercancel",cancel); el.addEventListener("pointerleave",cancel);
+  el.addEventListener("contextmenu",e=>e.preventDefault());
+  el.addEventListener("click",e=>{e.stopPropagation(); if(fired){fired=false;return;} onTap();});
+}
+let delTarget=null;
+function onLongPress(m){
+  if(!canDelete(m)){toast("Nur Admins können Objekte entfernen");return;}
+  const t=TYPES[m.typ]||TYPES.sonst; delTarget=m;
+  $("#dTag").textContent=t.short; $("#dTag").style.background=t.color;
+  $("#dType").textContent=t.label; $("#dTitle").textContent=m.titel;
+  $("#confirmDel").hidden=false; setTimeout(()=>$("#dBack").focus(),50);
+}
+$("#dBack").onclick=()=>{$("#confirmDel").hidden=true;delTarget=null;};
+$("#dYes").onclick=async()=>{
+  if(!delTarget) return; const b=$("#dYes"); b.disabled=true;
+  try{await api.deleteMarker(delTarget.id);$("#confirmDel").hidden=true;delTarget=null;vibrate(20);toast("Objekt entfernt");await refreshMarkers();}
+  catch(err){toast(err.message||"Entfernen fehlgeschlagen");}
+  finally{b.disabled=false;}
+};
+
+let openPopup=null;
 function drawMarkers(){
   mapMarkers.forEach(mm=>mm.remove()); mapMarkers=[];
-  markers.filter(m=>typeOn[m.typ]!==false).forEach(m=>{
-    const popup=new maplibregl.Popup({offset:[0,-40],maxWidth:"290px"}).setHTML(popupHtml(m));
-    popup.on("open",()=>{
-      const b=popup.getElement().querySelector("[data-del]"); if(!b) return;
-      b.onclick=async()=>{
-        if(!b.classList.contains("armed")){b.classList.add("armed");b.textContent="Wirklich entfernen?";vibrate(15);return;}
-        b.disabled=true;
-        try{await api.deleteMarker(m.id);popup.remove();toast("Objekt entfernt");await refreshMarkers();}
-        catch(err){toast(err.message||"Entfernen fehlgeschlagen");b.disabled=false;}
-      };
-    });
+  const filt=lineFilterActive();
+  const shown=markers.filter(m=>typeOn[m.typ]!==false && (!filt || nearOnLine(m)));
+  shown.forEach(m=>{
     const el=pinEl(m.typ); el.title=m.titel;
-    el.addEventListener("click",ev=>ev.stopPropagation());
-    mapMarkers.push(new maplibregl.Marker({element:el,anchor:"bottom"}).setLngLat([m.lng,m.lat]).setPopup(popup).addTo(map));
+    const mk=new maplibregl.Marker({element:el,anchor:"bottom"}).setLngLat([m.lng,m.lat]).addTo(map);
+    attachPress(el,m,()=>{
+      openPopup&&openPopup.remove();
+      openPopup=new maplibregl.Popup({offset:[0,-40],maxWidth:"290px"}).setLngLat([m.lng,m.lat]).setHTML(popupHtml(m)).addTo(map);
+    });
+    mapMarkers.push(mk);
   });
+  $("#lineFilterInfo").textContent = filt ? `${shown.length} von ${markers.length} Objekten an eingeschalteten Strecken` : "";
   renderTypeList();
 }
 async function refreshMarkers(){
@@ -609,17 +682,36 @@ $("#cYes").onclick=async()=>{
   finally{btn.disabled=false;}
 };
 
-/* Standort */
-let locMarker=null;
+/* Standort: live mitbewegen, Karte folgt bis man sie selbst verschiebt */
+let locMarker=null, watchId=null, follow=false, firstFix=true;
+function setFollow(on){follow=on;$("#btnLocate").classList.toggle("active",on);}
+function onPos(p){
+  const ll=[p.coords.longitude,p.coords.latitude];
+  if(!locMarker){
+    const el=document.createElement("div");el.className="me";el.innerHTML='<div class="me-acc"></div><div class="me-head" hidden></div><div class="me-dot"></div>';
+    locMarker=new maplibregl.Marker({element:el,rotationAlignment:"map"}).setLngLat(ll).addTo(map);
+  } else locMarker.setLngLat(ll);
+  const el=locMarker.getElement();
+  const mpp=156543.03*Math.cos(p.coords.latitude*Math.PI/180)/Math.pow(2,map.getZoom());
+  const acc=Math.min(300,Math.max(24,2*(p.coords.accuracy||0)/mpp));
+  const a=el.querySelector(".me-acc"); a.style.width=a.style.height=acc+"px";
+  const h=el.querySelector(".me-head");
+  if(p.coords.heading!=null && !isNaN(p.coords.heading) && (p.coords.speed||0)>0.5){h.hidden=false;locMarker.setRotation(p.coords.heading);} else {h.hidden=true;locMarker.setRotation(0);}
+  if(firstFix){firstFix=false;map.flyTo({center:ll,zoom:Math.max(map.getZoom(),16),speed:1.6});}
+  else if(follow) map.easeTo({center:ll,duration:800});
+}
 $("#btnLocate").onclick=()=>{
   if(!navigator.geolocation){toast("Dein Gerät unterstützt keine Standortabfrage");return;}
-  navigator.geolocation.getCurrentPosition(p=>{
-    const ll=[p.coords.longitude,p.coords.latitude];
-    if(!locMarker){const el=document.createElement("div");el.className="me-dot";locMarker=new maplibregl.Marker({element:el}).setLngLat(ll).addTo(map);}
-    else locMarker.setLngLat(ll);
-    map.flyTo({center:ll,zoom:Math.max(map.getZoom(),16),speed:1.6});
-  },()=>toast("Standort nicht verfügbar. Bitte im Browser erlauben."),{enableHighAccuracy:true,timeout:10000});
+  setFollow(true);
+  if(watchId===null){
+    firstFix=true;
+    watchId=navigator.geolocation.watchPosition(onPos,err=>{
+      toast(err.code===1?"Standort nicht erlaubt. Bitte im Browser freigeben.":"Standort gerade nicht verfügbar");
+      if(err.code===1){navigator.geolocation.clearWatch(watchId);watchId=null;setFollow(false);}
+    },{enableHighAccuracy:true,maximumAge:2000,timeout:20000});
+  } else if(locMarker){ map.flyTo({center:locMarker.getLngLat(),zoom:Math.max(map.getZoom(),16),speed:1.6}); }
 };
+map.on("dragstart",()=>setFollow(false));
 
 /* ============ Panels ============ */
 function closeSheets(){
