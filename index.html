@@ -913,10 +913,16 @@ $("#cYes").onclick=async()=>{
 };
 
 /* Standort: live mitbewegen, Karte folgt bis man sie selbst verschiebt */
-let locMarker=null, watchId=null, follow=false, firstFix=true;
+let locMarker=null, watchId=null, follow=false, firstFix=true, lastLL=null, flying=false, flyT=null;
+/* Zügig ganz nah heranfliegen; währenddessen keine Folge-Bewegungen, die den Flug abbrechen */
+function goToMe(ll){
+  flying=true; clearTimeout(flyT);
+  map.flyTo({center:ll,zoom:18.5,duration:1000,curve:1.2,essential:true});
+  flyT=setTimeout(()=>{flying=false;},1100);
+}
 function setFollow(on){follow=on;$("#btnLocate").classList.toggle("active",on);}
 function onPos(p){
-  const ll=[p.coords.longitude,p.coords.latitude];
+  const ll=[p.coords.longitude,p.coords.latitude]; lastLL=ll;
   if(!locMarker){
     const el=document.createElement("div");el.className="me";el.innerHTML='<div class="me-acc"></div><div class="me-head" hidden></div><div class="me-dot"></div>';
     locMarker=new maplibregl.Marker({element:el,rotationAlignment:"map"}).setLngLat(ll).addTo(map);
@@ -927,8 +933,8 @@ function onPos(p){
   const a=el.querySelector(".me-acc"); a.style.width=a.style.height=acc+"px";
   const h=el.querySelector(".me-head");
   if(p.coords.heading!=null && !isNaN(p.coords.heading) && (p.coords.speed||0)>0.5){h.hidden=false;locMarker.setRotation(p.coords.heading);} else {h.hidden=true;locMarker.setRotation(0);}
-  if(firstFix){firstFix=false;map.flyTo({center:ll,zoom:18.5,speed:1.6});}
-  else if(follow) map.easeTo({center:ll,duration:800});
+  if(firstFix){firstFix=false;goToMe(ll);}
+  else if(follow&&!flying) map.easeTo({center:ll,duration:600,easing:t=>t});
 }
 $("#btnLocate").onclick=()=>{
   if(!navigator.geolocation){toast("Dein Gerät unterstützt keine Standortabfrage");return;}
@@ -939,9 +945,9 @@ $("#btnLocate").onclick=()=>{
       toast(err.code===1?"Standort nicht erlaubt. Bitte im Browser freigeben.":"Standort gerade nicht verfügbar");
       if(err.code===1){navigator.geolocation.clearWatch(watchId);watchId=null;setFollow(false);}
     },{enableHighAccuracy:true,maximumAge:2000,timeout:20000});
-  } else if(locMarker){ map.flyTo({center:locMarker.getLngLat(),zoom:18.5,speed:1.6}); }
+  } else if(lastLL){ goToMe(lastLL); }
 };
-map.on("dragstart",()=>setFollow(false));
+map.on("dragstart",()=>{setFollow(false);flying=false;});
 
 /* ============ Panels ============ */
 function closeSheets(){
