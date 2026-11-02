@@ -315,7 +315,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 <!-- Objekt anlegen -->
 <section class="sheet" id="sheetAdd" aria-label="Objekt anlegen">
   <div class="grab"></div>
-  <header><h2>Objekt hinzufügen</h2><button class="x" data-close aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+  <header><h2 id="addHead">Objekt hinzufügen</h2><button class="x" data-close aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
   <form class="body" id="addForm">
     <p class="coords" id="addCoords"></p>
     <div class="group"><h3>Art</h3><div class="types" id="typePick"></div></div>
@@ -403,7 +403,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
   <div class="card">
     <h2 id="cHead">Wirklich hinzufügen?</h2>
     <div class="csum"><span class="tag" id="cTag"></span><div><b id="cTitle"></b><small id="cType"></small><small id="cPos"></small></div></div>
-    <p class="hint">Das Objekt ist danach für alle Kolleginnen und Kollegen sichtbar. Entfernen kann es nur ein Admin.</p>
+    <p class="hint" id="cHint">Das Objekt ist danach für alle Kolleginnen und Kollegen sichtbar. Entfernen kann es nur ein Admin.</p>
     <button class="btn primary block" id="cYes">Ja, hinzufügen</button>
     <button class="btn block" id="cBack">Zurück</button>
   </div>
@@ -478,6 +478,10 @@ function supabaseBackend(){
     onRecovery(cb){sb.auth.onAuthStateChange(ev=>{if(ev==="PASSWORD_RECOVERY") cb();});},
     async listMarkers(){const {data,error}=await sb.from("markers").select("*").order("created_at"); if(error) throw error; return data;},
     async addMarker(m){const {error}=await sb.from("markers").insert(m); if(error) throw error;},
+    async updateMarker(id,f){const {data:{session}}=await sb.auth.getSession();
+      const {error,count}=await sb.from("markers").update({...f,updated_at:new Date().toISOString(),updated_by:session?.user?.id},{count:"exact"}).eq("id",id);
+      if(error) throw new Error(/updated_/.test(error.message)?"Bitte zuerst das SQL für „Bearbeiten“ in Supabase ausführen.":error.message);
+      if(!count) throw new Error("Keine Berechtigung");},
     async deleteMarker(id){const {error,count}=await sb.from("markers").delete({count:"exact"}).eq("id",id); if(error) throw error; if(!count) throw new Error("Keine Berechtigung");},
     async listProfiles(){const {data,error}=await sb.from("profiles").select("*").order("created_at"); if(error) throw error; return data;},
     async setRole(id,role){const {error}=await sb.from("profiles").update({role}).eq("id",id); if(error) throw error;},
@@ -501,6 +505,8 @@ function demoBackend(){
     async signOut(){},
     async listMarkers(){return markers;},
     async addMarker(m){markers.push({...m,id:crypto.randomUUID(),created_by:current,created_at:new Date().toISOString()});save();},
+    async updateMarker(id,f){const u=users.find(x=>x.id===current); if(u.role!=="admin") throw new Error("Keine Berechtigung");
+      const m=markers.find(x=>x.id===id); if(m){Object.assign(m,f,{updated_at:new Date().toISOString(),updated_by:current});save();}},
     async deleteMarker(id){const m=markers.find(x=>x.id===id);const u=users.find(x=>x.id===current);
       if(!m) return; if(u.role!=="admin") throw new Error("Keine Berechtigung"); markers=markers.filter(x=>x.id!==id);save();},
     async listProfiles(){return users;},
@@ -832,7 +838,8 @@ function popupHtml(m){const t=TYPES[m.typ]||TYPES.sonst;const who=profiles[m.cre
   ${refChips(nearLineRefs(m.lat,m.lng,300),m.lat,m.lng)}
   ${m.notiz?`<p>${esc(m.notiz).replace(/\n/g,"<br>")}</p>`:""}
   ${navLinks(m)}
-  <p class="meta">Erfasst von ${esc(who)} am ${fmtDate(m.created_at)}<br>${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}${canDelete(m)?"<br>Zum Entfernen den Pin lange drücken.":""}</p></div>`;}
+  <p class="meta">Erfasst von ${esc(who)} am ${fmtDate(m.created_at)}${m.updated_at?`<br>Geändert von ${esc(profiles[m.updated_by]?.name||"Unbekannt")} am ${fmtDate(m.updated_at)}`:""}<br>${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}${canDelete(m)?"<br>Zum Entfernen den Pin lange drücken.":""}</p>
+  ${canDelete(m)?`<button class="btn block" type="button" data-edit="1">Bearbeiten</button>`:""}</div>`;}
 
 /* Abstand Punkt–Strecke in Metern (für den Streckenfilter) */
 function distToLineM(lat,lng,coords){
@@ -894,6 +901,7 @@ function drawMarkers(){
     attachPress(el,m,()=>{
       openPopup&&openPopup.remove();
       openPopup=new maplibregl.Popup({offset:[0,-40],maxWidth:"290px"}).setLngLat([m.lng,m.lat]).setHTML(popupHtml(m)).addTo(map);
+      const eb=openPopup.getElement().querySelector("[data-edit]"); if(eb) eb.onclick=()=>startEdit(m,el);
     });
     mapMarkers.push(mk);
   });
@@ -909,12 +917,12 @@ async function refreshMarkers(){
 }
 
 /* Hinzufügen */
-let addMode=false, pending=null, tempMarker=null;
+let addMode=false, pending=null, tempMarker=null, editId=null, editEl=null;
 function setAddMode(on){addMode=on;$("#addBanner").classList.toggle("on",on);map.getCanvas().style.cursor=on?"crosshair":"";}
 $("#btnAdd").onclick=()=>{closeSheets();setAddMode(!addMode);vibrate(10);};
 $("#addCancel").onclick=()=>setAddMode(false);
 map.on("click",e=>{
-  if(!addMode) return; setAddMode(false); pending=e.lngLat; vibrate(20);
+  if(!addMode) return; setAddMode(false); pending=e.lngLat; vibrate(20); setEditMode(null);
   tempMarker&&tempMarker.remove();
   tempMarker=new maplibregl.Marker({element:pinEl(pickedType(),"temp"),anchor:"bottom",draggable:true}).setLngLat(pending).addTo(map);
   tempMarker.on("dragend",()=>{pending=tempMarker.getLngLat();showCoords();});
@@ -922,6 +930,25 @@ map.on("click",e=>{
   map.easeTo({center:pending,offset:[0,-window.innerHeight*0.22],duration:500});
   openSheet("#sheetAdd");
 });
+function setEditMode(m){
+  editId=m?m.id:null;
+  $("#addHead").textContent=m?"Objekt bearbeiten":"Objekt hinzufügen";
+  $("#addSave").textContent=m?"Änderungen speichern":"Speichern";
+}
+function startEdit(m,el){
+  if(!canDelete(m)){toast("Nur Admins können Objekte bearbeiten");return;}
+  openPopup&&openPopup.remove(); closeSheets(); setAddMode(false);
+  setEditMode(m); pending={lat:m.lat,lng:m.lng};
+  editEl=el; if(el) el.style.visibility="hidden";
+  $("#addForm").reset();
+  const r=document.querySelector(`input[name=typ][value="${m.typ}"]`)||document.querySelector("input[name=typ]"); r.checked=true;
+  $("#fTitel").value=m.titel||""; $("#fNotiz").value=m.notiz||"";
+  tempMarker=new maplibregl.Marker({element:pinEl(pickedType(),"temp"),anchor:"bottom",draggable:true}).setLngLat([m.lng,m.lat]).addTo(map);
+  tempMarker.on("dragend",()=>{pending=tempMarker.getLngLat();showCoords();});
+  showCoords();
+  map.easeTo({center:[m.lng,m.lat],offset:[0,-window.innerHeight*0.22],duration:500});
+  openSheet("#sheetAdd");
+}
 function showCoords(){$("#addCoords").textContent=`Position ${pending.lat.toFixed(5)}, ${pending.lng.toFixed(5)} · Pin lässt sich verschieben`;}
 $("#typePick").addEventListener("change",()=>tempMarker&&(tempMarker.getElement().innerHTML=pinSvg(TYPES[pickedType()])));
 /* Erst Sicherheitsabfrage, dann speichern */
@@ -931,14 +958,19 @@ $("#addForm").onsubmit=e=>{
   $("#cTag").innerHTML=tagInner(t); $("#cTag").style.background=t.color;
   $("#cType").textContent=t.label; $("#cTitle").textContent=$("#fTitel").value.trim();
   $("#cPos").textContent=`${pending.lat.toFixed(5)}, ${pending.lng.toFixed(5)}`;
+  $("#cHead").textContent=editId?"Änderungen speichern?":"Wirklich hinzufügen?";
+  $("#cYes").textContent=editId?"Ja, speichern":"Ja, hinzufügen";
+  $("#cHint").textContent=editId?"Die Änderungen sind danach für alle sichtbar.":"Das Objekt ist danach für alle Kolleginnen und Kollegen sichtbar. Entfernen kann es nur ein Admin.";
   $("#confirmAdd").hidden=false; vibrate(15); setTimeout(()=>$("#cBack").focus(),50);
 };
 $("#cBack").onclick=()=>{$("#confirmAdd").hidden=true;};
 $("#cYes").onclick=async()=>{
   const btn=$("#cYes"); btn.disabled=true;
   try{
-    await api.addMarker({lat:pending.lat,lng:pending.lng,typ:pickedType(),titel:$("#fTitel").value.trim(),notiz:$("#fNotiz").value.trim()||null});
-    $("#confirmAdd").hidden=true; closeSheets(); vibrate(20); toast("Objekt hinzugefügt"); await refreshMarkers();
+    const data={lat:pending.lat,lng:pending.lng,typ:pickedType(),titel:$("#fTitel").value.trim(),notiz:$("#fNotiz").value.trim()||null};
+    const wasEdit=!!editId;
+    if(wasEdit) await api.updateMarker(editId,data); else await api.addMarker(data);
+    $("#confirmAdd").hidden=true; closeSheets(); vibrate(20); toast(wasEdit?"Änderungen gespeichert":"Objekt hinzugefügt"); await refreshMarkers();
   }catch(err){toast("Speichern fehlgeschlagen: "+err.message);}
   finally{btn.disabled=false;}
 };
@@ -1017,6 +1049,8 @@ function closeSheets(){
   document.querySelectorAll(".sheet.open").forEach(s=>s.classList.remove("open"));
   $("#scrim").classList.remove("on");
   if(tempMarker){tempMarker.remove();tempMarker=null;}
+  if(editEl){editEl.style.visibility="";editEl=null;}
+  if(editId) setEditMode(null);
 }
 function openSheet(sel){
   document.querySelectorAll(".sheet").forEach(s=>s.classList.toggle("open","#"+s.id===sel));

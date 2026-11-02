@@ -61,3 +61,8 @@ alter publication supabase_realtime add table public.markers;
 
 -- NACH deiner eigenen Registrierung in der App einmal ausführen (E-Mail anpassen):
 -- update public.profiles set role = 'admin' where email = 'deine@mail.de';
+
+-- Bearbeiten (nur Admins), mit Vermerk wer zuletzt geändert hat
+alter table public.markers add column if not exists updated_at timestamptz;
+alter table public.markers add column if not exists updated_by uuid references public.profiles(id) on delete set null;
+create policy "Objekte bearbeiten" on public.markers for update to authenticated using (is_admin()) with check (is_admin());
