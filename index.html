@@ -325,7 +325,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
     <details class="group fold" data-fold="base" open><summary><h3>Kartengrundlage</h3><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="foldbody">
       <div class="seg">
         <label><input type="radio" name="base" value="sat" id="baseSat">Luftbild</label>
-        <label><input type="radio" name="base" value="satlab" id="baseSatLab">Mit Orten</label>
+        <label><input type="radio" name="base" value="satlab" id="baseSatLab">Hybrid</label>
         <label><input type="radio" name="base" value="osm" id="baseOsm">Straße</label>
       </div>
     </div></details>
@@ -597,6 +597,7 @@ const sources = {
     tileSize:256,minzoom:11,maxzoom:20,bounds:[8.9,47.2,13.9,50.6],attribution:'Luftbild © <a href="https://geodaten.bayern.de" target="_blank">Bayerische Vermessungsverwaltung</a>, CC BY 4.0'},
   labels:{type:"raster",tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"],tileSize:256,maxzoom:19},
   osm:{type:"raster",tiles:["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],tileSize:256,maxzoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'},
+  omt:{type:"vector",url:"https://tiles.openfreemap.org/planet",attribution:'<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/" target="_blank">OpenMapTiles</a>'},
   lines:{type:"geojson",data:emptyFC},
   pts:{type:"geojson",data:emptyFC},
   km:{type:"geojson",data:emptyFC}
@@ -611,6 +612,19 @@ const map = new maplibregl.Map({
     {id:"sat",type:"raster",source:"sat",paint:{"raster-fade-duration":200}},
     {id:"dop",type:"raster",source:"dop",minzoom:11,paint:{"raster-fade-duration":250}},
     {id:"labels",type:"raster",source:"labels",layout:{visibility:"none"}},
+    {id:"hy-road",type:"line",source:"omt","source-layer":"transportation",minzoom:12,layout:{visibility:"none","line-cap":"round","line-join":"round"},
+      filter:["in",["get","class"],["literal",["motorway","trunk","primary","secondary","tertiary","minor","service"]]],
+      paint:{"line-color":["match",["get","class"],["motorway","trunk"],"rgba(255,214,102,.75)",["primary","secondary"],"rgba(255,240,180,.6)","rgba(255,255,255,.45)"],
+        "line-width":["interpolate",["linear"],["zoom"],12,["match",["get","class"],["motorway","trunk","primary"],1.6,0.6],18,["match",["get","class"],["motorway","trunk","primary","secondary"],6,"service",1.5,3.5]]}},
+    {id:"hy-roadname",type:"symbol",source:"omt","source-layer":"transportation_name",minzoom:13,layout:{visibility:"none","symbol-placement":"line","text-field":["coalesce",["get","name:de"],["get","name"]],
+      "text-font":["Open Sans Semibold"],"text-size":["interpolate",["linear"],["zoom"],13,10.5,18,14],"text-max-angle":30,"symbol-spacing":250,"text-padding":2},
+      paint:{"text-color":"#ffffff","text-halo-color":"rgba(0,0,0,.8)","text-halo-width":1.6}},
+    {id:"hy-house",type:"symbol",source:"omt","source-layer":"housenumber",minzoom:17,layout:{visibility:"none","text-field":["get","housenumber"],"text-font":["Open Sans Semibold"],"text-size":11},
+      paint:{"text-color":"#ffffff","text-halo-color":"rgba(0,0,0,.75)","text-halo-width":1.3}},
+    {id:"hy-place",type:"symbol",source:"omt","source-layer":"place",layout:{visibility:"none","text-field":["coalesce",["get","name:de"],["get","name"]],"text-font":["Open Sans Semibold"],
+      "text-size":["match",["get","class"],"city",17,"town",15,"village",13,"suburb",13,12],"text-max-width":8,"text-padding":4},
+      filter:["in",["get","class"],["literal",["city","town","village","suburb","quarter","neighbourhood","hamlet"]]],
+      paint:{"text-color":"#ffffff","text-halo-color":"rgba(0,0,0,.8)","text-halo-width":1.8}},
     ...ORM.map(o=>({id:"orm-"+o.key,type:"raster",source:"orm-"+o.key,layout:{visibility:"none"},paint:{"raster-fade-duration":200}})),
     {id:"lines-casing",type:"line",source:"lines",layout:{"line-cap":"round","line-join":"round"},paint:{"line-color":"#ffffff","line-width":["interpolate",["linear"],["zoom"],8,4,16,10],"line-opacity":.9}},
     {id:"lines",type:"line",source:"lines",layout:{"line-cap":"round","line-join":"round"},paint:{"line-color":["get","color"],"line-width":["interpolate",["linear"],["zoom"],8,2,16,6]}},
@@ -656,7 +670,7 @@ $("#btnCompass").onclick=()=>map.easeTo({bearing:0,pitch:0,duration:600});
 
 const setVis=(id,on)=>map.getLayer(id)&&map.setLayoutProperty(id,"visibility",on?"visible":"none");
 function setBase(v){
-  setVis("osm",v==="osm"); setVis("sat",v!=="osm"); setVis("dop",v!=="osm"); setVis("labels",v==="satlab"); store.set("sa_base",v);
+  setVis("osm",v==="osm"); setVis("sat",v!=="osm"); setVis("dop",v!=="osm"); setVis("labels",false); ["hy-road","hy-roadname","hy-house","hy-place"].forEach(id=>setVis(id,v==="satlab")); store.set("sa_base",v);
 }
 const savedBase = store.get("sa_base","sat");
 document.querySelector(`input[name=base][value=${savedBase}]`).checked = true;
