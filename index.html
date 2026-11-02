@@ -914,20 +914,52 @@ function goToMe(ll){
   flyT=setTimeout(()=>{flying=false;},1100);
 }
 function setFollow(on){follow=on;$("#btnLocate").classList.toggle("active",on);}
+/* Flüssige Bewegung: zwischen zwei GPS-Meldungen wird Position und Richtung
+   pro Bildschirmbild weich übergeblendet, die Karte folgt ohne Ruckler */
+let curLL=null, fromLL=null, toLL=null, animStart=0, animDur=0, lastFixT=0, rafId=null;
+let curHead=null, toHead=null, lastAcc=0, touching=false;
+const mapBox=map.getCanvasContainer();
+mapBox.addEventListener("touchstart",()=>{touching=true;},{passive:true});
+mapBox.addEventListener("touchend",e=>{if(!e.touches.length) touching=false;},{passive:true});
+function updateAcc(){
+  if(!locMarker||!curLL) return;
+  const mpp=156543.03*Math.cos(curLL[1]*Math.PI/180)/Math.pow(2,map.getZoom());
+  const acc=Math.min(400,Math.max(24,2*lastAcc/mpp));
+  const a=locMarker.getElement().querySelector(".me-acc"); a.style.width=a.style.height=acc+"px";
+}
+map.on("zoom",updateAcc);
+function tick(t){
+  const k=animDur?Math.min(1,(t-animStart)/animDur):1;
+  curLL=[fromLL[0]+(toLL[0]-fromLL[0])*k, fromLL[1]+(toLL[1]-fromLL[1])*k];
+  locMarker.setLngLat(curLL);
+  if(toHead!=null){
+    if(curHead==null) curHead=toHead;
+    const d=((toHead-curHead+540)%360)-180;   // kürzester Drehweg
+    curHead=(curHead+d*Math.min(1,0.15+k*0.2)+360)%360;
+    locMarker.setRotation(curHead);
+  }
+  if(follow&&!flying&&!touching) map.jumpTo({center:curLL});
+  rafId = (k<1 || (toHead!=null && curHead!=null && Math.abs(((toHead-curHead+540)%360)-180)>0.5)) ? requestAnimationFrame(tick) : null;
+}
 function onPos(p){
-  const ll=[p.coords.longitude,p.coords.latitude]; lastLL=ll;
+  const ll=[p.coords.longitude,p.coords.latitude], now=performance.now(); lastLL=ll;
   if(!locMarker){
     const el=document.createElement("div");el.className="me";el.innerHTML='<div class="me-acc"></div><div class="me-head" hidden></div><div class="me-dot"></div>';
     locMarker=new maplibregl.Marker({element:el,rotationAlignment:"map"}).setLngLat(ll).addTo(map);
-  } else locMarker.setLngLat(ll);
-  const el=locMarker.getElement();
-  const mpp=156543.03*Math.cos(p.coords.latitude*Math.PI/180)/Math.pow(2,map.getZoom());
-  const acc=Math.min(300,Math.max(24,2*(p.coords.accuracy||0)/mpp));
-  const a=el.querySelector(".me-acc"); a.style.width=a.style.height=acc+"px";
-  const h=el.querySelector(".me-head");
-  if(p.coords.heading!=null && !isNaN(p.coords.heading) && (p.coords.speed||0)>0.5){h.hidden=false;locMarker.setRotation(p.coords.heading);} else {h.hidden=true;locMarker.setRotation(0);}
-  if(firstFix){firstFix=false;goToMe(ll);}
-  else if(follow&&!flying) map.easeTo({center:ll,duration:600,easing:t=>t});
+    curLL=ll;
+  }
+  // Übergangszeit = Abstand der GPS-Meldungen, damit der Punkt gleichmäßig weitergleitet
+  animDur = lastFixT ? Math.min(2500,Math.max(250,now-lastFixT)) : 0; lastFixT=now;
+  fromLL = curLL || ll; toLL = ll; animStart = now;
+  // Große Sprünge (z. B. erster genauer Fix) nicht animieren
+  const jump=Math.hypot((ll[0]-fromLL[0])*72000,(ll[1]-fromLL[1])*111000);
+  if(jump>300) {fromLL=ll; animDur=0;}
+  lastAcc=p.coords.accuracy||0; updateAcc();
+  const h=locMarker.getElement().querySelector(".me-head");
+  if(p.coords.heading!=null && !isNaN(p.coords.heading) && (p.coords.speed||0)>0.7){h.hidden=false; toHead=p.coords.heading;}
+  else if((p.coords.speed||0)<0.3){h.hidden=true; toHead=null; curHead=null; locMarker.setRotation(0);}
+  if(firstFix){firstFix=false; goToMe(ll);}
+  if(!rafId) rafId=requestAnimationFrame(tick);
 }
 $("#btnLocate").onclick=()=>{
   if(!navigator.geolocation){toast("Dein Gerät unterstützt keine Standortabfrage");return;}
