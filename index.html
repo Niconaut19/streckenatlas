@@ -891,7 +891,7 @@ function onPos(p){
   const a=el.querySelector(".me-acc"); a.style.width=a.style.height=acc+"px";
   const h=el.querySelector(".me-head");
   if(p.coords.heading!=null && !isNaN(p.coords.heading) && (p.coords.speed||0)>0.5){h.hidden=false;locMarker.setRotation(p.coords.heading);} else {h.hidden=true;locMarker.setRotation(0);}
-  if(firstFix){firstFix=false;map.flyTo({center:ll,zoom:Math.max(map.getZoom(),16),speed:1.6});}
+  if(firstFix){firstFix=false;map.flyTo({center:ll,zoom:18.5,speed:1.6});}
   else if(follow) map.easeTo({center:ll,duration:800});
 }
 $("#btnLocate").onclick=()=>{
@@ -903,7 +903,7 @@ $("#btnLocate").onclick=()=>{
       toast(err.code===1?"Standort nicht erlaubt. Bitte im Browser freigeben.":"Standort gerade nicht verfügbar");
       if(err.code===1){navigator.geolocation.clearWatch(watchId);watchId=null;setFollow(false);}
     },{enableHighAccuracy:true,maximumAge:2000,timeout:20000});
-  } else if(locMarker){ map.flyTo({center:locMarker.getLngLat(),zoom:Math.max(map.getZoom(),16),speed:1.6}); }
+  } else if(locMarker){ map.flyTo({center:locMarker.getLngLat(),zoom:18.5,speed:1.6}); }
 };
 map.on("dragstart",()=>setFollow(false));
 
