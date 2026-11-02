@@ -253,7 +253,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
         <label><input type="radio" name="base" value="osm" id="baseOsm">Straße</label>
       </div>
     </div>
-    <div class="group"><h3>Bahn-Ebenen</h3><div class="list" id="ormList"></div></div>
+    <div class="group"><h3>Bahn-Ebenen</h3><div class="list" id="ormList"></div><p class="hint" style="margin-top:8px">„Alle Gleise“ zeigt das gesamte Gleisnetz, unabhängig von deiner Streckenauswahl unten.</p></div>
     <div class="group"><h3>Strecken in Bayern</h3>
       <p class="hint" id="linesHint">Streckendaten werden geladen …</p>
       <div id="linesBox" hidden class="stack">
@@ -439,7 +439,7 @@ const api = CONFIG.SUPABASE_URL ? supabaseBackend() : demoBackend();
 
 /* ============ KARTE (MapLibre: drehen, neigen, weich zoomen) ============ */
 const ORM = [
-  {key:"standard",        label:"Infrastruktur",          color:"#f39200", def:true},
+  {key:"standard",        label:"Alle Gleise",            color:"#f39200", def:false},
   {key:"maxspeed",        label:"Höchstgeschwindigkeit",  color:"#ec0016"},
   {key:"signals",         label:"Signale & Zugsicherung", color:"#408335"},
   {key:"electrification", label:"Elektrifizierung",       color:"#0c3992"},
@@ -489,6 +489,8 @@ document.querySelector(`input[name=base][value=${savedBase}]`).checked = true;
 document.querySelectorAll("input[name=base]").forEach(r=>r.addEventListener("change",e=>setBase(e.target.value)));
 
 const ormState = store.get("sa_orm",Object.fromEntries(ORM.map(o=>[o.key,!!o.def])));
+/* Einmalig: "Alle Gleise" ausschalten, sonst überdeckt sie die eigene Streckenauswahl */
+if(!store.get("sa_orm_v2",false)){ormState.standard=false;store.set("sa_orm_v2",true);}
 const toggle = (attr,val,on) => `<span class="toggle"><input type="checkbox" ${attr}="${val}" ${on?"checked":""}><i></i></span>`;
 $("#ormList").innerHTML = ORM.map(o=>`<label class="opt"><span class="swatch" style="background:${o.color}"></span><span class="lbl">${o.label}</span>${toggle("data-orm",o.key,ormState[o.key])}</label>`).join("");
 const applyOrm=()=>{ORM.forEach(o=>setVis("orm-"+o.key,ormState[o.key]));store.set("sa_orm",ormState);};
@@ -508,7 +510,16 @@ function updateLinesSource(){
   src.setData({type:"FeatureCollection",features:[...lines.values()].filter(l=>l.on).map(l=>l.feature)});
 }
 const saveLineOff=()=>{lines.forEach(l=>{if(l.on) delete lineOff[l.id]; else lineOff[l.id]=true;});store.set("sa_by_off",lineOff);};
-function refreshLinesUI(){updateLinesSource();renderLines();drawMarkers();}
+function refreshLinesUI(){updateLinesSource();renderLines();drawMarkers();hideAllTracksIfNeeded();}
+/* Wer Strecken auswählt, will nur diese sehen: Ebene "Alle Gleise" dann ausschalten */
+function hideAllTracksIfNeeded(){
+  if(!ormState.standard||!lines.size) return;
+  let on=0; lines.forEach(l=>{if(l.on) on++;});
+  if(on===lines.size) return;
+  ormState.standard=false; applyOrm();
+  const cb=document.querySelector('[data-orm="standard"]'); if(cb) cb.checked=false;
+  toast("Ebene „Alle Gleise“ ausgeschaltet, damit nur deine Strecken zu sehen sind");
+}
 function fitLine(l){
   const b=new maplibregl.LngLatBounds();
   l.feature.geometry.coordinates.forEach(seg=>seg.forEach(c=>b.extend(c)));
@@ -550,7 +561,7 @@ function renderLines(){
     + (arr.length>MAX_ROWS ? `<div class="opt"><span class="hint">${arr.length-MAX_ROWS} weitere – tippe eine Nummer oder einen Ort ins Suchfeld.</span></div>` : "");
 }
 let filterT; $("#lineFilter").oninput=()=>{clearTimeout(filterT);filterT=setTimeout(renderLines,120);};
-$("#lineList").addEventListener("change",e=>{const l=lines.get(+e.target.dataset.line);if(l){l.on=e.target.checked;saveLineOff();updateLinesSource();renderLines();drawMarkers();}});
+$("#lineList").addEventListener("change",e=>{const l=lines.get(+e.target.dataset.line);if(l){l.on=e.target.checked;saveLineOff();refreshLinesUI();}});
 $("#lineList").addEventListener("click",e=>{
   const go=e.target.closest("[data-go]"); if(!go) return;
   const l=lines.get(+go.dataset.go); if(!l) return;
