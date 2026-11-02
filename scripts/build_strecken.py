@@ -27,8 +27,20 @@ KX = 111320 * math.cos(math.radians(LAT0))
 KY = 110540
 
 
-def fetch():
-    body = urllib.parse.urlencode({"data": QUERY}).encode()
+POINTS_QUERY = (
+    '[out:json][timeout:900];'
+    'area["ISO3166-2"="DE-BY"]->.by;'
+    '('
+    'node["railway"~"^(station|halt|junction|spur_junction|crossover|service_station|yard|site)$"](area.by);'
+    'node["railway"="level_crossing"](area.by);'
+    ');'
+    'out;'
+)
+SKIP_STATION = {"subway", "monorail", "funicular", "tram"}
+
+
+def fetch(query=QUERY):
+    body = urllib.parse.urlencode({"data": query}).encode()
     for url in ENDPOINTS:
         for attempt in range(3):
             try:
@@ -134,8 +146,51 @@ def build(data):
     }
 
 
+def build_points(data):
+    feats = []
+    for n in data.get("elements", []):
+        if n.get("type") != "node":
+            continue
+        t = n.get("tags", {})
+        kind = t.get("railway")
+        if kind == "level_crossing":
+            props = {"t": "bue"}
+            if t.get("name"):
+                props["n"] = t["name"]
+        else:
+            if t.get("station") in SKIP_STATION or t.get("subway") == "yes":
+                continue
+            if t.get("tram") == "yes" and t.get("train") != "yes":
+                continue
+            props = {"t": "bst", "k": kind}
+            name = t.get("name") or t.get("railway:name")
+            if name:
+                props["n"] = name
+            ril = t.get("railway:ref") or t.get("railway:ref:DB")
+            if ril:
+                props["r"] = ril
+            if "n" not in props and "r" not in props:
+                continue
+        feats.append({"type": "Feature", "properties": props,
+                      "geometry": {"type": "Point", "coordinates": [round(n["lon"], 5), round(n["lat"], 5)]}})
+    return {"type": "FeatureCollection", "attribution": "© OpenStreetMap-Mitwirkende, ODbL", "features": feats}
+
+
+def write(fc, out):
+    import os
+    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump(fc, f, ensure_ascii=False, separators=(",", ":"))
+    print(f"{len(fc['features'])} Einträge geschrieben nach {out} ({os.path.getsize(out) // 1024} KB)")
+
+
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "data/strecken-bayern.geojson"
+    pts_out = sys.argv[2] if len(sys.argv) > 2 else "data/punkte-bayern.geojson"
+    pts = build_points(fetch(POINTS_QUERY))
+    if len(pts["features"]) < 500:
+        sys.exit(f"Nur {len(pts['features'])} Bahnanlagen gefunden, Datei wird nicht überschrieben")
+    write(pts, pts_out)
     fc = build(fetch())
     if len(fc["features"]) < 50:
         sys.exit(f"Nur {len(fc['features'])} Strecken gefunden, Datei wird nicht überschrieben")

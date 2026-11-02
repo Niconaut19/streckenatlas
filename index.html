@@ -253,6 +253,10 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
         <label><input type="radio" name="base" value="osm" id="baseOsm">Straße</label>
       </div>
     </div>
+    <div class="group"><h3>Bahnanlagen an deinen Strecken</h3><div class="list">
+      <label class="opt"><span class="tag" style="background:#fff;border:3px solid #ec0016;min-width:18px;height:18px;padding:0;border-radius:50%"></span><span class="lbl">Bahnhöfe &amp; Betriebsstellen<br><small>mit DS100-Kürzel</small></span><span class="toggle"><input type="checkbox" id="ptsBst" data-pts="bst"><i></i></span></label>
+      <label class="opt"><span class="tag" style="background:#f39200;min-width:14px;height:14px;padding:0;border-radius:50%"></span><span class="lbl">Bahnübergänge<br><small>ab näherem Zoom</small></span><span class="toggle"><input type="checkbox" id="ptsBue" data-pts="bue"><i></i></span></label>
+    </div></div>
     <div class="group"><h3>Bahn-Ebenen</h3><div class="list" id="ormList"></div><p class="hint" style="margin-top:8px">„Alle Gleise“ zeigt das gesamte Gleisnetz, unabhängig von deiner Streckenauswahl unten.</p></div>
     <div class="group"><h3>Strecken in Bayern</h3>
       <p class="hint" id="linesHint">Streckendaten werden geladen …</p>
@@ -451,21 +455,36 @@ const sources = {
   sat:{type:"raster",tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],tileSize:256,maxzoom:19,attribution:"Bilder © Esri, Maxar, Earthstar Geographics"},
   labels:{type:"raster",tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"],tileSize:256,maxzoom:19},
   osm:{type:"raster",tiles:["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],tileSize:256,maxzoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'},
-  lines:{type:"geojson",data:emptyFC}
+  lines:{type:"geojson",data:emptyFC},
+  pts:{type:"geojson",data:emptyFC}
 };
 ORM.forEach(o=>sources["orm-"+o.key]={type:"raster",tiles:["a","b","c"].map(s=>`https://${s}.tiles.openrailwaymap.org/${o.key}/{z}/{x}/{y}.png`),tileSize:256,maxzoom:19,attribution:ormAttr});
 
 const view = store.get("sa_view2",{center:[10.45,51.16],zoom:5.5,bearing:0,pitch:0});
 const map = new maplibregl.Map({
   container:"map",
-  style:{version:8,sources,layers:[
+  style:{version:8,glyphs:"https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",sources,layers:[
     {id:"osm",type:"raster",source:"osm",layout:{visibility:"none"}},
     {id:"sat",type:"raster",source:"sat",paint:{"raster-fade-duration":200}},
     {id:"labels",type:"raster",source:"labels",layout:{visibility:"none"}},
     ...ORM.map(o=>({id:"orm-"+o.key,type:"raster",source:"orm-"+o.key,layout:{visibility:"none"},paint:{"raster-fade-duration":200}})),
     {id:"lines-casing",type:"line",source:"lines",layout:{"line-cap":"round","line-join":"round"},paint:{"line-color":"#ffffff","line-width":["interpolate",["linear"],["zoom"],8,4,16,10],"line-opacity":.9}},
     {id:"lines",type:"line",source:"lines",layout:{"line-cap":"round","line-join":"round"},paint:{"line-color":["get","color"],"line-width":["interpolate",["linear"],["zoom"],8,2,16,6]}},
-    {id:"lines-hit",type:"line",source:"lines",paint:{"line-color":"#000","line-width":22,"line-opacity":0}}
+    {id:"lines-hit",type:"line",source:"lines",paint:{"line-color":"#000","line-width":22,"line-opacity":0}},
+    {id:"bue",type:"circle",source:"pts",minzoom:12,filter:["==",["get","t"],"bue"],
+      paint:{"circle-radius":["interpolate",["linear"],["zoom"],12,3,16,6],"circle-color":"#f39200","circle-stroke-color":"#ffffff","circle-stroke-width":1.5}},
+    {id:"bst",type:"circle",source:"pts",filter:["==",["get","t"],"bst"],
+      minzoom:8,
+      paint:{"circle-radius":["interpolate",["linear"],["zoom"],8,["match",["get","k"],"station",3.5,2],14,["match",["get","k"],"station",8,6]],
+        "circle-color":["match",["get","k"],"station","#ffffff","halt","#ffffff","#d7dce1"],
+        "circle-stroke-color":["match",["get","k"],"station","#ec0016","halt","#ec0016","#282d37"],
+        "circle-stroke-width":["match",["get","k"],"station",3,2]}},
+    {id:"bst-label",type:"symbol",source:"pts",filter:["all",["==",["get","t"],"bst"],["any",["in",["get","k"],["literal",["station","halt"]]],[">=",["zoom"],12]]],
+      minzoom:10,
+      layout:{"text-field":["format",["coalesce",["get","n"],""],{},["case",["has","r"],["concat","\n",["get","r"]],""],{"font-scale":0.85}],
+        "text-font":["Open Sans Semibold"],"text-size":["interpolate",["linear"],["zoom"],10,11,15,14],
+        "text-offset":[0,1.1],"text-anchor":"top","text-max-width":10,"text-optional":true},
+      paint:{"text-color":"#282d37","text-halo-color":"#ffffff","text-halo-width":1.8}}
   ]},
   center:view.center, zoom:view.zoom, bearing:view.bearing||0, pitch:view.pitch||0,
   maxPitch:60, attributionControl:false, dragRotate:true, touchPitch:true
@@ -510,7 +529,7 @@ function updateLinesSource(){
   src.setData({type:"FeatureCollection",features:[...lines.values()].filter(l=>l.on).map(l=>l.feature)});
 }
 const saveLineOff=()=>{lines.forEach(l=>{if(l.on) delete lineOff[l.id]; else lineOff[l.id]=true;});store.set("sa_by_off",lineOff);};
-function refreshLinesUI(){updateLinesSource();renderLines();drawMarkers();hideAllTracksIfNeeded();}
+function refreshLinesUI(){updateLinesSource();renderLines();drawMarkers();hideAllTracksIfNeeded();updatePoints();}
 /* Wer Strecken auswählt, will nur diese sehen: Ebene "Alle Gleise" dann ausschalten */
 function hideAllTracksIfNeeded(){
   if(!ormState.standard||!lines.size) return;
@@ -541,6 +560,36 @@ async function loadBayern(){
   }
 }
 map.on("load",loadBayern);
+
+/* Bahnanlagen (Bahnhöfe, Betriebsstellen, Bahnübergänge) – nur an eingeschalteten Strecken */
+let allPts=[];
+const ptsOn = store.get("sa_pts",{bst:true,bue:true});
+async function loadPoints(){
+  try{const r=await fetch("data/punkte-bayern.geojson",{cache:"no-cache"}); if(!r.ok) return; allPts=(await r.json()).features; updatePoints();}
+  catch{}
+}
+map.on("load",loadPoints);
+$("#ptsBst").checked=ptsOn.bst!==false; $("#ptsBue").checked=ptsOn.bue!==false;
+document.querySelectorAll("[data-pts]").forEach(cb=>cb.onchange=()=>{ptsOn[cb.dataset.pts]=cb.checked;store.set("sa_pts",ptsOn);updatePoints();});
+
+function lineBox(l){
+  if(l.box) return l.box;
+  let w=180,s=90,e=-180,n=-90;
+  l.feature.geometry.coordinates.forEach(seg=>seg.forEach(([x,y])=>{if(x<w)w=x;if(x>e)e=x;if(y<s)s=y;if(y>n)n=y;}));
+  return l.box=[w-0.004,s-0.003,e+0.004,n+0.003];
+}
+function updatePoints(){
+  const src=map.getSource("pts"); if(!src) return;
+  let onLines=[]; lines.forEach(l=>{if(l.on) onLines.push(l);});
+  const all = lines.size>0 && onLines.length===lines.size;
+  const want=allPts.filter(f=>ptsOn[f.properties.t]!==false);
+  let res;
+  if(!lines.size||all) res=want;
+  else if(!onLines.length) res=[];
+  else res=want.filter(f=>{const [x,y]=f.geometry.coordinates;
+    return onLines.some(l=>{const b=lineBox(l); return x>=b[0]&&x<=b[2]&&y>=b[1]&&y<=b[3]&&distToLineM(y,x,l.feature.geometry.coordinates)<=150;});});
+  src.setData({type:"FeatureCollection",features:res});
+}
 
 function visibleLines(){
   const f=$("#lineFilter").value.trim().toLowerCase();
@@ -573,14 +622,25 @@ $("#btnAllOff").onclick=()=>{visibleLines().forEach(l=>l.on=false);saveLineOff()
 $("#lineFilterToggle").checked=lineFilterOn; $("#lineRadius").value=lineFilterRadius;
 $("#lineFilterToggle").onchange=e=>{lineFilterOn=e.target.checked;store.set("sa_linefilter",lineFilterOn);drawMarkers();};
 $("#lineRadius").onchange=e=>{lineFilterRadius=e.target.value;store.set("sa_lineradius",lineFilterRadius);drawMarkers();};
-map.on("click","lines-hit",e=>{
-  if(addMode||e.originalEvent.__handled) return;
-  const p=e.features[0].properties; e.originalEvent.__handled=true;
-  new maplibregl.Popup({offset:8,maxWidth:"260px"}).setLngLat(e.lngLat)
-    .setHTML(`<div class="pop"><span class="t"><span class="swatch" style="background:${p.color}"></span>Strecke</span><h4>${esc(p.ref)}</h4><p>${esc(p.name)}</p></div>`).addTo(map);
+const BST_KIND={station:"Bahnhof",halt:"Haltepunkt",junction:"Abzweigstelle",spur_junction:"Anschlussstelle",crossover:"Überleitstelle",service_station:"Betriebsbahnhof",yard:"Rangierbahnhof",site:"Betriebsstelle"};
+map.on("click",e=>{
+  if(addMode) return;
+  const hit=map.queryRenderedFeatures([[e.point.x-12,e.point.y-12],[e.point.x+12,e.point.y+12]],{layers:["bst","bue","lines-hit"].filter(id=>map.getLayer(id))});
+  if(!hit.length) return;
+  const f=hit.find(h=>h.layer.id==="bst")||hit.find(h=>h.layer.id==="bue")||hit[0];
+  const p=f.properties; let html;
+  if(f.layer.id==="lines-hit"){
+    html=`<div class="pop"><span class="t"><span class="swatch" style="background:${p.color}"></span>Strecke</span><h4>${esc(p.ref)}</h4><p>${esc(p.name)}</p></div>`;
+  } else {
+    const [lng,lat]=f.geometry.coordinates, m={lat,lng};
+    const title = p.t==="bue" ? (p.n||"Bahnübergang") : (p.n||p.r);
+    const kind = p.t==="bue" ? "Bahnübergang" : (BST_KIND[p.k]||"Betriebsstelle");
+    html=`<div class="pop"><span class="t">${esc(kind)}${p.r?` · DS100 <b>${esc(p.r)}</b>`:""}</span><h4>${esc(title)}</h4>${navLinks(m)}<p class="meta">${lat.toFixed(5)}, ${lng.toFixed(5)}</p></div>`;
+  }
+  openPopup&&openPopup.remove();
+  openPopup=new maplibregl.Popup({offset:10,maxWidth:"290px"}).setLngLat(f.geometry.type==="Point"?f.geometry.coordinates:e.lngLat).setHTML(html).addTo(map);
 });
-map.on("mouseenter","lines-hit",()=>map.getCanvas().style.cursor="pointer");
-map.on("mouseleave","lines-hit",()=>map.getCanvas().style.cursor="");
+["lines-hit","bst","bue"].forEach(id=>{map.on("mouseenter",id,()=>map.getCanvas().style.cursor="pointer");map.on("mouseleave",id,()=>map.getCanvas().style.cursor=addMode?"crosshair":"");});
 
 /* ============ OBJEKTE ============ */
 let me=null, markers=[], profiles={}, mapMarkers=[];
