@@ -1,7 +1,7 @@
 """Baut data/strecken-bayern.geojson aus OpenStreetMap (Overpass).
 
-Alle Eisenbahnstrecken-Relationen (route=railway) in Bayern, mit
-Streckennummer (ref) und Name. Die Geometrie wird vereinfacht, damit die
+Alle Eisenbahnstrecken-Relationen in Bayern (route=tracks und route=railway),
+zusammengefasst je Streckennummer (ref), mit Name. Die Geometrie wird vereinfacht, damit die
 Datei auf dem Handy schnell lädt.
 """
 import json
@@ -14,7 +14,7 @@ import urllib.request
 QUERY = (
     '[out:json][timeout:900];'
     'area["ISO3166-2"="DE-BY"]->.by;'
-    'relation["route"="railway"](area.by);'
+    'relation["route"~"^(railway|tracks)$"](area.by);'
     'out geom;'
 )
 ENDPOINTS = [
@@ -78,28 +78,51 @@ def ref_key(ref):
     return (int(digits) if digits else 99999, ref)
 
 
+def rel_segments(rel):
+    segs = []
+    for m in rel.get("members", []):
+        if m.get("type") != "way" or not m.get("geometry"):
+            continue
+        pts = [[round(g["lon"], 5), round(g["lat"], 5)] for g in m["geometry"]]
+        pts = simplify(pts, TOLERANCE_M)
+        if len(pts) >= 2:
+            segs.append(pts)
+    return segs
+
+
 def build(data):
-    features = []
+    groups = {}
     for rel in data.get("elements", []):
         if rel.get("type") != "relation":
             continue
         tags = rel.get("tags", {})
-        segs = []
-        for m in rel.get("members", []):
-            if m.get("type") != "way" or not m.get("geometry"):
-                continue
-            pts = [[round(g["lon"], 5), round(g["lat"], 5)] for g in m["geometry"]]
-            pts = simplify(pts, TOLERANCE_M)
-            if len(pts) >= 2:
-                segs.append(pts)
+        ref = (tags.get("ref") or "").strip()
+        key = ref if ref else f"id:{rel['id']}"
+        groups.setdefault(key, []).append(rel)
+
+    features = []
+    for key, rels in groups.items():
+        # route=tracks ist in Deutschland die Infrastruktur-Strecke; route=railway nur, wenn es keine gibt
+        tracks = [r for r in rels if r.get("tags", {}).get("route") == "tracks"]
+        use = tracks or rels
+        segs, seen = [], set()
+        for rel in use:
+            for seg in rel_segments(rel):
+                k = (tuple(seg[0]), tuple(seg[-1]), len(seg))
+                if k in seen:
+                    continue
+                seen.add(k)
+                segs.append(seg)
         if not segs:
             continue
+        names = [r.get("tags", {}).get("name") or r.get("tags", {}).get("description") for r in use]
+        name = next((n for n in names if n), "Strecke")
         features.append({
             "type": "Feature",
             "properties": {
-                "id": rel["id"],
-                "ref": tags.get("ref", "–"),
-                "name": tags.get("name") or tags.get("description") or "Strecke",
+                "id": use[0]["id"],
+                "ref": key if not key.startswith("id:") else "–",
+                "name": name,
             },
             "geometry": {"type": "MultiLineString", "coordinates": segs},
         })
