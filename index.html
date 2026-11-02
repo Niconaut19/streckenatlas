@@ -252,25 +252,14 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
       </div>
     </div>
     <div class="group"><h3>Bahn-Ebenen</h3><div class="list" id="ormList"></div></div>
-    <div class="group"><h3>Strecke suchen</h3>
-      <form class="searchrow" id="lineSearchForm">
-        <div class="field search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="lineQuery" enterkeyhint="search" autocomplete="off" placeholder="Nummer oder Name, z. B. 1700" aria-label="Strecke suchen"></div>
-        <button class="btn primary" id="btnLineSearch" type="submit">Suchen</button>
-      </form>
-      <div id="resultsBox" hidden>
-        <div class="resulthead"><span class="hint" id="resultsInfo"></span><button class="btn small" id="btnAddAllResults" type="button">Alle hinzufügen</button></div>
-        <div class="list" id="lineResults"></div>
-      </div>
-      <button class="linkbtn" id="btnLoadLines" type="button" style="margin-top:8px">Alle Strecken im Kartenausschnitt hinzufügen</button>
-    </div>
-    <div class="group"><h3>Meine Strecken</h3>
-      <p class="hint" id="linesHint">Noch keine Strecke ausgewählt. Suche oben nach einer Streckennummer oder einem Namen und füge sie hinzu.</p>
+    <div class="group"><h3>Strecken in Bayern</h3>
+      <p class="hint" id="linesHint">Streckendaten werden geladen …</p>
       <div id="linesBox" hidden class="stack">
-        <div class="row"><button class="btn small" id="btnAllOn" type="button">Alle an</button><button class="btn small" id="btnAllOff" type="button">Alle aus</button><button class="btn small danger" id="btnAllRemove" type="button">Alle entfernen</button></div>
-        <div class="field search" id="lineFilterField"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="lineFilter" placeholder="In meinen Strecken filtern" aria-label="Meine Strecken filtern"></div>
+        <div class="field search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="lineFilter" type="search" enterkeyhint="search" autocomplete="off" placeholder="Nummer oder Name, z. B. 5300 oder München" aria-label="Strecken suchen"></div>
+        <div class="resulthead"><span class="hint" id="linesCount"></span><span class="row"><button class="btn small" id="btnAllOn" type="button">Alle an</button><button class="btn small" id="btnAllOff" type="button">Alle aus</button></span></div>
         <div class="list" id="lineList"></div>
         <div class="list">
-          <label class="opt"><span class="lbl">Nur Objekte an eingeschalteten Strecken<br><small>Gilt, sobald mindestens eine Strecke an ist</small></span><span class="toggle"><input type="checkbox" id="lineFilterToggle"><i></i></span></label>
+          <label class="opt"><span class="lbl">Nur Objekte an eingeschalteten Strecken<br><small>Gilt, solange nicht alle Strecken an sind</small></span><span class="toggle"><input type="checkbox" id="lineFilterToggle"><i></i></span></label>
           <label class="opt"><span class="lbl">Abstand zur Strecke</span><select id="lineRadius" class="minisel"><option value="100">bis 100 m</option><option value="300">bis 300 m</option><option value="1000">bis 1 km</option></select></label>
         </div>
         <p class="hint" id="lineFilterInfo"></p>
@@ -504,11 +493,10 @@ $("#ormList").addEventListener("change",e=>{const k=e.target.dataset.orm;if(k){o
 
 map.on("load",()=>{setBase(savedBase);applyOrm();updateLinesSource();});
 
-/* ============ STRECKEN: suchen, auswählen, ein-/ausschalten (Overpass) ============ */
+/* ============ STRECKEN IN BAYERN (fest hinterlegt, monatlich aktualisiert) ============ */
 const lines = new Map();
-const lineOff = store.get("sa_lines_off",{});
+const lineOff = store.get("sa_by_off",{});        // ausgeschaltete Strecken
 let lineFilterOn = store.get("sa_linefilter",true), lineFilterRadius = store.get("sa_lineradius","300");
-let results = null;
 function colorFor(s){let h=0;for(const c of String(s))h=(h*31+c.charCodeAt(0))%360;return `hsl(${h} 80% 52%)`;}
 const refNum = r => parseInt(String(r).replace(/\D.*/,""))||99999;
 const byRef = (a,b)=>refNum(a.ref)-refNum(b.ref)||a.name.localeCompare(b.name);
@@ -516,130 +504,61 @@ function updateLinesSource(){
   const src=map.getSource("lines"); if(!src) return;
   src.setData({type:"FeatureCollection",features:[...lines.values()].filter(l=>l.on).map(l=>l.feature)});
 }
-async function overpass(q){
-  const r=await fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:"data="+encodeURIComponent(q)});
-  if(!r.ok) throw new Error(r.status===429||r.status===504?"Der Streckenserver ist gerade ausgelastet. Bitte gleich noch einmal versuchen.":"Laden fehlgeschlagen ("+r.status+")");
-  return r.json();
-}
-function addRelations(elements){
-  let neu=0;
-  for(const rel of elements){
-    if(lines.has(rel.id)) continue;
-    const segs=(rel.members||[]).filter(m=>m.type==="way"&&m.geometry).map(m=>m.geometry.map(p=>[p.lon,p.lat]));
-    if(!segs.length) continue;
-    const ref=rel.tags?.ref||"–", name=rel.tags?.name||rel.tags?.description||"Strecke", color=colorFor(ref+name);
-    lines.set(rel.id,{id:rel.id,ref,name,color,on:!lineOff[rel.id],
-      feature:{type:"Feature",properties:{id:rel.id,ref,name,color},geometry:{type:"MultiLineString",coordinates:segs}}});
-    neu++;
-  }
-  saveLineIds(); return neu;
-}
-const saveLineIds=()=>store.set("sa_lines_saved",[...lines.keys()].slice(-400));
-const saveLineOff=()=>{lines.forEach(l=>{if(l.on) delete lineOff[l.id]; else lineOff[l.id]=true;});store.set("sa_lines_off",lineOff);};
-function refreshLinesUI(){updateLinesSource();renderLines();renderResults();drawMarkers();}
-async function addByIds(ids){
-  ids=ids.filter(id=>!lines.has(id)); if(!ids.length) return 0;
-  let n=0;
-  for(let i=0;i<ids.length;i+=60){
-    const j=await overpass(`[out:json][timeout:90];relation(id:${ids.slice(i,i+60).join(",")});out geom;`);
-    n+=addRelations(j.elements);
-  }
-  refreshLinesUI(); return n;
-}
+const saveLineOff=()=>{lines.forEach(l=>{if(l.on) delete lineOff[l.id]; else lineOff[l.id]=true;});store.set("sa_by_off",lineOff);};
+function refreshLinesUI(){updateLinesSource();renderLines();drawMarkers();}
 function fitLine(l){
   const b=new maplibregl.LngLatBounds();
   l.feature.geometry.coordinates.forEach(seg=>seg.forEach(c=>b.extend(c)));
   closeSheets(); map.fitBounds(b,{padding:{top:90,bottom:60,left:40,right:90},duration:900,maxZoom:15});
 }
-
-/* Suche in ganz Deutschland nach Nummer oder Name */
-$("#lineSearchForm").onsubmit=async e=>{
-  e.preventDefault(); const q=$("#lineQuery").value.trim(); if(!q) return;
-  $("#lineQuery").blur();
-  const btn=$("#btnLineSearch"); btn.disabled=true; btn.textContent="Sucht …";
-  const rx=q.replace(/[.*+?^${}()|[\]\\"]/g,"\\$&");
-  const sel=/^\d+$/.test(q)?`["ref"~"^${rx}"]`:`["name"~"${rx}",i]`;
+async function loadBayern(){
   try{
-    const j=await overpass(`[out:json][timeout:60];area["ISO3166-1"="DE"][admin_level=2]->.de;relation["route"="railway"]${sel}(area.de);out tags 80;`);
-    results=j.elements.map(el=>({id:el.id,ref:el.tags?.ref||"–",name:el.tags?.name||el.tags?.description||"Strecke"})).sort(byRef);
-    renderResults();
-  }catch(err){toast(err.message||"Suche fehlgeschlagen");}
-  finally{btn.disabled=false;btn.textContent="Suchen";}
-};
-function renderResults(){
-  if(!results){$("#resultsBox").hidden=true;return;}
-  $("#resultsBox").hidden=false;
-  const open=results.filter(r=>!lines.has(r.id)).length;
-  $("#resultsInfo").textContent = !results.length ? "Keine Strecke gefunden" : results.length>=80 ? "Mehr als 80 Treffer, bitte genauer suchen" : `${results.length} Treffer`;
-  $("#btnAddAllResults").hidden = open<2;
-  $("#lineResults").hidden = !results.length;
-  $("#lineResults").innerHTML = results.map(r=>{const done=lines.has(r.id);
-    return `<div class="opt"><span class="ref">${esc(r.ref)}</span><span class="lbl"><span class="lname">${esc(r.name)}</span></span><button type="button" class="addbtn ${done?"done":""}" data-add="${r.id}" ${done?"disabled":""}>${done?"✓ Dabei":"+ Hinzufügen"}</button></div>`;}).join("");
+    const r=await fetch("data/strecken-bayern.geojson",{cache:"no-cache"});
+    if(!r.ok) throw new Error(r.status);
+    const fc=await r.json();
+    for(const f of fc.features){
+      const {id,ref,name}=f.properties, color=colorFor(ref+name);
+      f.properties.color=color;
+      lines.set(id,{id,ref,name,color,on:!lineOff[id],feature:f});
+    }
+    refreshLinesUI();
+  }catch(e){
+    $("#linesHint").textContent="Die Streckendaten sind noch nicht da. Sie werden gerade vorbereitet, bitte in ein paar Minuten neu laden.";
+  }
 }
-$("#lineResults").addEventListener("click",async e=>{
-  const b=e.target.closest("[data-add]"); if(!b||b.disabled) return;
-  const id=+b.dataset.add; b.disabled=true; b.textContent="Lädt …";
-  try{await addByIds([id]); const l=lines.get(id); toast(l?`Strecke ${l.ref} hinzugefügt`:"Für diese Strecke gibt es keinen Verlauf"); vibrate(10);}
-  catch(err){toast(err.message);renderResults();}
-});
-$("#btnAddAllResults").onclick=async()=>{
-  const b=$("#btnAddAllResults"); b.disabled=true; b.textContent="Lädt …";
-  try{const n=await addByIds(results.map(r=>r.id)); toast(`${n} Strecken hinzugefügt`);}
-  catch(err){toast(err.message);}
-  finally{b.disabled=false;b.textContent="Alle hinzufügen";}
-};
+map.on("load",loadBayern);
 
-/* Alle Strecken im aktuellen Kartenausschnitt */
-async function loadLines(){
-  if(map.getZoom()<9){toast("Bitte näher heranzoomen, etwa auf eine Region");return;}
-  const b=map.getBounds(), btn=$("#btnLoadLines");
-  btn.disabled=true; btn.textContent="Strecken werden geladen …";
-  try{
-    const j=await overpass(`[out:json][timeout:60];relation["route"="railway"](${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()});out geom;`);
-    const neu=addRelations(j.elements); refreshLinesUI();
-    toast(neu?`${neu} Strecken hinzugefügt`:"Keine neuen Strecken in diesem Ausschnitt");
-  }catch(e){toast(e.message||"Laden fehlgeschlagen");}
-  finally{btn.disabled=false;btn.textContent="Alle Strecken im Kartenausschnitt hinzufügen";}
-}
-$("#btnLoadLines").onclick=loadLines;
-
-/* Meine Strecken */
-const goIcon='<svg viewBox="0 0 24 24"><path d="M4 12h14M13 6l6 6-6 6"/></svg>';
-const xIcon='<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>';
-function renderLines(){
+function visibleLines(){
   const f=$("#lineFilter").value.trim().toLowerCase();
-  const arr=[...lines.values()].filter(l=>!f||(l.ref+" "+l.name).toLowerCase().includes(f)).sort(byRef);
-  $("#linesHint").hidden=lines.size>0; $("#linesBox").hidden=lines.size===0;
-  $("#lineFilterField").hidden=lines.size<8;
-  $("#lineList").innerHTML = arr.length ? arr.map(l=>`<div class="opt">
-      <button type="button" class="linego" data-go="${l.id}" title="Auf der Karte zeigen"><span class="swatch" style="background:${l.color}"></span><span class="ref">${esc(l.ref)}</span><span class="lbl"><span class="lname">${esc(l.name)}</span></span></button>
-      <span class="toggle"><input type="checkbox" data-line="${l.id}" aria-label="Strecke ${esc(l.ref)} anzeigen" ${l.on?"checked":""}><i></i></span>
-      <button type="button" class="iconbtn" data-remove="${l.id}" aria-label="Strecke ${esc(l.ref)} entfernen">${xIcon}</button></div>`).join("")
-    : `<div class="opt"><span class="hint">Keine Strecke passt zum Filter.</span></div>`;
+  return [...lines.values()].filter(l=>!f||(l.ref+" "+l.name).toLowerCase().includes(f)).sort(byRef);
 }
-$("#lineList").addEventListener("change",e=>{const l=lines.get(+e.target.dataset.line);if(l){l.on=e.target.checked;updateLinesSource();saveLineOff();drawMarkers();}});
+const MAX_ROWS=150;
+function renderLines(){
+  const arr=visibleLines(), f=$("#lineFilter").value.trim(), onCount=[...lines.values()].filter(l=>l.on).length;
+  $("#linesHint").hidden=lines.size>0; $("#linesBox").hidden=lines.size===0;
+  $("#linesCount").textContent = f ? `${arr.length} Treffer` : `${onCount} von ${lines.size} an`;
+  $("#btnAllOn").textContent = f ? "Treffer an" : "Alle an";
+  $("#btnAllOff").textContent = f ? "Treffer aus" : "Alle aus";
+  const rows=arr.slice(0,MAX_ROWS);
+  $("#lineList").innerHTML = (rows.length ? rows.map(l=>`<div class="opt">
+      <button type="button" class="linego" data-go="${l.id}" title="Auf der Karte zeigen"><span class="swatch" style="background:${l.color}"></span><span class="ref">${esc(l.ref)}</span><span class="lbl"><span class="lname">${esc(l.name)}</span></span></button>
+      <span class="toggle"><input type="checkbox" data-line="${l.id}" aria-label="Strecke ${esc(l.ref)} anzeigen" ${l.on?"checked":""}><i></i></span></div>`).join("")
+    : `<div class="opt"><span class="hint">Keine Strecke gefunden.</span></div>`)
+    + (arr.length>MAX_ROWS ? `<div class="opt"><span class="hint">${arr.length-MAX_ROWS} weitere – tippe eine Nummer oder einen Ort ins Suchfeld.</span></div>` : "");
+}
+let filterT; $("#lineFilter").oninput=()=>{clearTimeout(filterT);filterT=setTimeout(renderLines,120);};
+$("#lineList").addEventListener("change",e=>{const l=lines.get(+e.target.dataset.line);if(l){l.on=e.target.checked;saveLineOff();updateLinesSource();renderLines();drawMarkers();}});
 $("#lineList").addEventListener("click",e=>{
-  const go=e.target.closest("[data-go]"); if(go){const l=lines.get(+go.dataset.go); if(l){if(!l.on){l.on=true;saveLineOff();refreshLinesUI();} fitLine(l);} return;}
-  const rm=e.target.closest("[data-remove]"); if(rm){const id=+rm.dataset.remove; lines.delete(id); delete lineOff[id]; store.set("sa_lines_off",lineOff); saveLineIds(); refreshLinesUI();}
+  const go=e.target.closest("[data-go]"); if(!go) return;
+  const l=lines.get(+go.dataset.go); if(!l) return;
+  if(!l.on){l.on=true;saveLineOff();refreshLinesUI();}
+  fitLine(l);
 });
-$("#lineFilter").oninput=renderLines;
-$("#btnAllOn").onclick=()=>{lines.forEach(l=>l.on=true);saveLineOff();refreshLinesUI();};
-$("#btnAllOff").onclick=()=>{lines.forEach(l=>l.on=false);saveLineOff();refreshLinesUI();};
-$("#btnAllRemove").onclick=()=>{
-  const b=$("#btnAllRemove");
-  if(!b.classList.contains("armed")){b.classList.add("armed");b.textContent="Wirklich alle entfernen?";setTimeout(()=>{b.classList.remove("armed");b.textContent="Alle entfernen";},3500);return;}
-  lines.clear(); for(const k in lineOff) delete lineOff[k]; store.set("sa_lines_off",lineOff); saveLineIds();
-  b.classList.remove("armed"); b.textContent="Alle entfernen"; refreshLinesUI();
-};
+$("#btnAllOn").onclick=()=>{visibleLines().forEach(l=>l.on=true);saveLineOff();refreshLinesUI();};
+$("#btnAllOff").onclick=()=>{visibleLines().forEach(l=>l.on=false);saveLineOff();refreshLinesUI();};
 $("#lineFilterToggle").checked=lineFilterOn; $("#lineRadius").value=lineFilterRadius;
 $("#lineFilterToggle").onchange=e=>{lineFilterOn=e.target.checked;store.set("sa_linefilter",lineFilterOn);drawMarkers();};
 $("#lineRadius").onchange=e=>{lineFilterRadius=e.target.value;store.set("sa_lineradius",lineFilterRadius);drawMarkers();};
-
-/* Gespeicherte Auswahl beim Start wiederherstellen */
-map.on("load",()=>{
-  const ids=store.get("sa_lines_saved",[]);
-  if(ids.length) addByIds(ids).catch(()=>toast("Deine Strecken konnten gerade nicht geladen werden"));
-});
 map.on("click","lines-hit",e=>{
   if(addMode||e.originalEvent.__handled) return;
   const p=e.features[0].properties; e.originalEvent.__handled=true;
@@ -695,7 +614,7 @@ function distToLineM(lat,lng,coords){
   }
   return best;
 }
-function lineFilterActive(){return lineFilterOn && [...lines.values()].some(l=>l.on);}
+function lineFilterActive(){if(!lineFilterOn||!lines.size) return false; let on=0; lines.forEach(l=>{if(l.on) on++;}); return on>0 && on<lines.size;}
 function nearOnLine(m){
   const r=+lineFilterRadius;
   for(const l of lines.values()){ if(l.on && distToLineM(m.lat,m.lng,l.feature.geometry.coordinates)<=r) return true; }
