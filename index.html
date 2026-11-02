@@ -446,6 +446,7 @@ const TYPES = {
   weiche: {label:"Weiche",                   short:"W",  color:"#0c3992"},
   uw:     {label:"Unterwerk / Schaltposten", short:"UW", color:"#309fd1"},
   gsmr:   {label:"GSM-R-Mast",               short:"GS", color:"#00a099"},
+  dienst: {label:"Dienststelle",             short:"⌂",  color:"#14181d", icon:"home"},
   sonst:  {label:"Sonstiges",                short:"?",  color:"#646973"}
 };
 
@@ -795,15 +796,22 @@ map.on("click",e=>{
 /* ============ OBJEKTE ============ */
 let me=null, markers=[], profiles={}, mapMarkers=[];
 const typeOn = store.get("sa_types",Object.fromEntries(Object.keys(TYPES).map(k=>[k,true])));
-const pinSvg = t => `<svg viewBox="0 0 34 44"><path d="M17 43C17 43 3 27.5 3 17a14 14 0 0 1 28 0c0 10.5-14 26-14 26z" fill="${t.color}" stroke="#fff" stroke-width="2.5"/><text x="17" y="21" text-anchor="middle">${esc(t.short)}</text></svg>`;
+const HOME_PATH="M-6 0.5 0-5 6 0.5M-4 -1v6h3v-3.5h2V5h3v-6";
+const pinSvg = t => `<svg viewBox="0 0 34 44"><path d="M17 43C17 43 3 27.5 3 17a14 14 0 0 1 28 0c0 10.5-14 26-14 26z" fill="${t.color}" stroke="#fff" stroke-width="2.5"/>${t.icon==="home"
+  ? `<g transform="translate(17 17)" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${HOME_PATH}"/></g>`
+  : `<text x="17" y="21" text-anchor="middle">${esc(t.short)}</text>`}</svg>`;
+/* Inhalt der kleinen farbigen Typ-Marke: Haus-Symbol oder Kürzel */
+const tagInner = t => t.icon==="home"
+  ? `<svg viewBox="-8 -8 16 16" width="15" height="15" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${HOME_PATH}"/></svg>`
+  : esc(t.short);
 function pinEl(typ,extra=""){const el=document.createElement("div");el.className="mk "+extra;el.innerHTML=pinSvg(TYPES[typ]||TYPES.sonst);return el;}
 
-$("#typePick").innerHTML = Object.entries(TYPES).map(([k,t],i)=>`<label><input type="radio" name="typ" value="${k}" id="typ-${k}" ${i===0?"checked":""}><span class="tag" style="background:${t.color}">${t.short}</span>${t.label}</label>`).join("");
+$("#typePick").innerHTML = Object.entries(TYPES).map(([k,t],i)=>`<label><input type="radio" name="typ" value="${k}" id="typ-${k}" ${i===0?"checked":""}><span class="tag" style="background:${t.color}">${tagInner(t)}</span>${t.label}</label>`).join("");
 const pickedType=()=>document.querySelector("input[name=typ]:checked").value;
 
 function renderTypeList(){
   const counts={}; markers.forEach(m=>counts[m.typ]=(counts[m.typ]||0)+1);
-  $("#typeList").innerHTML = Object.entries(TYPES).map(([k,t])=>`<label class="opt"><span class="tag" style="background:${t.color}">${t.short}</span><span class="lbl">${t.label}</span><small>${counts[k]||0}</small>${toggle("data-type",k,typeOn[k]!==false)}</label>`).join("");
+  $("#typeList").innerHTML = Object.entries(TYPES).map(([k,t])=>`<label class="opt"><span class="tag" style="background:${t.color}">${tagInner(t)}</span><span class="lbl">${t.label}</span><small>${counts[k]||0}</small>${toggle("data-type",k,typeOn[k]!==false)}</label>`).join("");
 }
 $("#typeList").addEventListener("change",e=>{const k=e.target.dataset.type;if(k){typeOn[k]=e.target.checked;store.set("sa_types",typeOn);drawMarkers();}});
 
@@ -820,7 +828,7 @@ function navLinks(m){
     : `<a class="btn primary block navbtn" href="${google}" target="_blank" rel="noopener">${navIcon}Navigation starten</a>`;
 }
 function popupHtml(m){const t=TYPES[m.typ]||TYPES.sonst;const who=profiles[m.created_by]?.name||"Unbekannt";
-  return `<div class="pop"><span class="t"><span class="tag" style="background:${t.color}">${esc(t.short)}</span>${esc(t.label)}</span><h4>${esc(m.titel)}</h4>
+  return `<div class="pop"><span class="t"><span class="tag" style="background:${t.color}">${tagInner(t)}</span>${esc(t.label)}</span><h4>${esc(m.titel)}</h4>
   ${refChips(nearLineRefs(m.lat,m.lng,300),m.lat,m.lng)}
   ${m.notiz?`<p>${esc(m.notiz).replace(/\n/g,"<br>")}</p>`:""}
   ${navLinks(m)}
@@ -863,7 +871,7 @@ let delTarget=null;
 function onLongPress(m){
   if(!canDelete(m)){toast("Nur Admins können Objekte entfernen");return;}
   const t=TYPES[m.typ]||TYPES.sonst; delTarget=m;
-  $("#dTag").textContent=t.short; $("#dTag").style.background=t.color;
+  $("#dTag").innerHTML=tagInner(t); $("#dTag").style.background=t.color;
   $("#dType").textContent=t.label; $("#dTitle").textContent=m.titel;
   $("#confirmDel").hidden=false; setTimeout(()=>$("#dBack").focus(),50);
 }
@@ -920,7 +928,7 @@ $("#typePick").addEventListener("change",()=>tempMarker&&(tempMarker.getElement(
 $("#addForm").onsubmit=e=>{
   e.preventDefault(); if(!pending) return;
   const t=TYPES[pickedType()];
-  $("#cTag").textContent=t.short; $("#cTag").style.background=t.color;
+  $("#cTag").innerHTML=tagInner(t); $("#cTag").style.background=t.color;
   $("#cType").textContent=t.label; $("#cTitle").textContent=$("#fTitel").value.trim();
   $("#cPos").textContent=`${pending.lat.toFixed(5)}, ${pending.lng.toFixed(5)}`;
   $("#confirmAdd").hidden=false; vibrate(15); setTimeout(()=>$("#cBack").focus(),50);
