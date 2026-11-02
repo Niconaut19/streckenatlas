@@ -115,7 +115,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .opt small{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
 .toggle{position:relative;width:46px;height:28px;flex:none}
 .toggle input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
-.toggle i{position:absolute;inset:0;border-radius:999px;background:var(--grey-2);transition:background .2s}
+.toggle i{position:absolute;inset:0;pointer-events:none;border-radius:999px;background:var(--grey-2);transition:background .2s}
 .toggle i::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .22s var(--ease)}
 .toggle input:checked+i{background:var(--red)}
 .toggle input:checked+i::after{transform:translateX(18px)}
