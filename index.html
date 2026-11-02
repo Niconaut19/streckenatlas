@@ -323,12 +323,24 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
       <button type="button" role="tab" aria-selected="true" data-mode="in">Anmelden</button>
       <button type="button" role="tab" aria-selected="false" data-mode="up">Registrieren</button>
     </div>
-    <div class="field" id="nameField" hidden><label for="aName">Name</label><input id="aName" autocomplete="name"></div>
+    <div class="field" id="nameField" hidden><label for="aName">Vor- und Nachname</label><input id="aName" autocomplete="name"></div>
     <div class="field"><label for="aMail">E-Mail</label><input id="aMail" type="email" required autocomplete="email"></div>
     <div class="field"><label for="aPw">Passwort</label><input id="aPw" type="password" required minlength="8" autocomplete="current-password"></div>
     <p class="err" id="authErr"></p>
     <button class="btn primary block" type="submit" id="authBtn">Anmelden</button>
     <button class="linkbtn" type="button" id="btnForgot">Passwort vergessen?</button>
+  </form>
+</div>
+
+<div class="gate" id="verifyGate" hidden>
+  <form class="card" id="verifyForm">
+    <h2>E-Mail bestätigen</h2>
+    <p class="hint">Wir haben dir einen Code an <b id="vMail"></b> geschickt. Gib ihn hier ein.</p>
+    <div class="field"><label for="vCode">Bestätigungscode</label><input id="vCode" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456" style="font-size:24px;letter-spacing:.3em;text-align:center;font-variant-numeric:tabular-nums"></div>
+    <p class="err" id="vErr"></p>
+    <button class="btn primary block" type="submit" id="vBtn">Bestätigen</button>
+    <button class="linkbtn" type="button" id="vResend">Code erneut senden</button>
+    <button class="linkbtn" type="button" id="vBack">Zurück zur Anmeldung</button>
   </form>
 </div>
 
@@ -414,7 +426,9 @@ function supabaseBackend(){
   return {
     demo:false, me,
     async signIn(email,pw){const {error}=await sb.auth.signInWithPassword({email,password:pw}); if(error) throw error;},
-    async signUp(email,pw,name){const {error}=await sb.auth.signUp({email,password:pw,options:{data:{name}}}); if(error) throw error;},
+    async signUp(email,pw,name){const {data,error}=await sb.auth.signUp({email,password:pw,options:{data:{name}}}); if(error) throw error; return {needsCode:!data.session};},
+    async verifyCode(email,token){const {error}=await sb.auth.verifyOtp({email,token,type:"signup"}); if(error) throw error;},
+    async resendCode(email){const {error}=await sb.auth.resend({type:"signup",email}); if(error) throw error;},
     async signOut(){await sb.auth.signOut();},
     async resetPassword(email){const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname}); if(error) throw error;},
     async updatePassword(pw){const {error}=await sb.auth.updateUser({password:pw}); if(error) throw error;},
@@ -943,13 +957,41 @@ document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{
 $("#authForm").onsubmit=async e=>{
   e.preventDefault(); const err=$("#authErr"); err.textContent=""; err.classList.remove("ok"); const btn=$("#authBtn"); btn.disabled=true;
   try{
-    if(authMode==="up"){await api.signUp($("#aMail").value.trim(),$("#aPw").value,$("#aName").value.trim());
-      err.classList.add("ok"); err.textContent="Konto angelegt. Falls eine Bestätigungs-Mail kommt, bitte den Link öffnen und dann anmelden.";}
-    else {await api.signIn($("#aMail").value.trim(),$("#aPw").value);}
+    const mail=$("#aMail").value.trim();
+    if(authMode==="up"){
+      if(!$("#aName").value.trim()){err.textContent="Bitte gib deinen Namen an, damit der Admin dich erkennt.";$("#aName").focus();return;}
+      const res=await api.signUp(mail,$("#aPw").value,$("#aName").value.trim());
+      if(res&&res.needsCode){showVerify(mail);return;}
+    }
+    else {await api.signIn(mail,$("#aPw").value);}
     await start();
-  }catch(e2){err.textContent=/Invalid login/i.test(e2.message)?"E-Mail oder Passwort stimmt nicht.":/not confirmed/i.test(e2.message)?"Bitte bestätige zuerst deine E-Mail-Adresse über den Link in der Mail.":e2.message;}
+  }catch(e2){
+    if(/not confirmed/i.test(e2.message)){const mail=$("#aMail").value.trim(); showVerify(mail); try{await api.resendCode(mail);}catch{} return;}
+    err.textContent=/Invalid login/i.test(e2.message)?"E-Mail oder Passwort stimmt nicht.":/already registered/i.test(e2.message)?"Für diese E-Mail gibt es schon ein Konto. Bitte melde dich an.":/Password should/i.test(e2.message)?"Das Passwort muss mindestens 8 Zeichen haben.":e2.message;}
   finally{btn.disabled=false;}
 };
+/* E-Mail mit Code bestätigen */
+let verifyMail="";
+function showVerify(mail){
+  verifyMail=mail; $("#vMail").textContent=mail; $("#vCode").value=""; $("#vErr").textContent=""; $("#vErr").classList.remove("ok");
+  $("#gate").hidden=true; $("#verifyGate").hidden=false; setTimeout(()=>$("#vCode").focus(),60);
+}
+$("#vCode").oninput=e=>{e.target.value=e.target.value.replace(/\D/g,"").slice(0,10);};
+$("#verifyForm").onsubmit=async e=>{
+  e.preventDefault(); const code=$("#vCode").value.trim(), err=$("#vErr"); err.classList.remove("ok");
+  if(code.length<6){err.textContent="Bitte den Code aus der E-Mail eingeben.";return;}
+  const btn=$("#vBtn"); btn.disabled=true;
+  try{await api.verifyCode(verifyMail,code); $("#verifyGate").hidden=true; vibrate(20); toast("E-Mail bestätigt"); await start();}
+  catch(e2){err.textContent=/expired|invalid/i.test(e2.message)?"Der Code stimmt nicht oder ist abgelaufen. Fordere einen neuen an.":e2.message;}
+  finally{btn.disabled=false;}
+};
+$("#vResend").onclick=async()=>{
+  const err=$("#vErr"); err.classList.remove("ok");
+  try{await api.resendCode(verifyMail); err.classList.add("ok"); err.textContent="Neuer Code ist unterwegs. Schau auch im Spam-Ordner nach.";}
+  catch(e){err.textContent=/rate|seconds/i.test(e.message)?"Bitte kurz warten, dann kannst du einen neuen Code anfordern.":e.message;}
+};
+$("#vBack").onclick=()=>{$("#verifyGate").hidden=true;$("#gate").hidden=false;};
+
 $("#btnForgot").hidden = api.demo;
 $("#btnForgot").onclick=async()=>{
   const err=$("#authErr"), mail=$("#aMail").value.trim(); err.classList.remove("ok");
