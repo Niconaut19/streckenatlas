@@ -204,6 +204,8 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .fold .foldbody{padding-top:12px}
 .sheet .body:has(.fold){gap:0}
 .kmbig{font-weight:600;color:var(--muted);font-size:15px;font-variant-numeric:tabular-nums}
+.linerow{cursor:pointer;-webkit-user-select:none;user-select:none}
+.linerow:active{background:var(--grey-1)}
 .toast{position:fixed;z-index:60;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);
   transform:translate(-50%,20px);opacity:0;transition:all .3s var(--ease);pointer-events:none;
   background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-weight:600;max-width:calc(100% - 110px);text-align:center;box-shadow:var(--shadow)}
@@ -702,6 +704,9 @@ function visibleLines(){
   return [...lines.values()].filter(l=>!f||(l.ref+" "+l.name).toLowerCase().includes(f)).sort(byRef);
 }
 const MAX_ROWS=150;
+const showIcon='<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>';
+/* Streckennummer vorne im Namen nicht doppelt anzeigen */
+const shortName=l=>l.name.startsWith(l.ref)?l.name.slice(l.ref.length).replace(/^[\s:–-]+/,"")||l.name:l.name;
 function renderLines(){
   const arr=visibleLines(), f=$("#lineFilter").value.trim(), onCount=[...lines.values()].filter(l=>l.on).length;
   $("#linesHint").hidden=lines.size>0; $("#linesBox").hidden=lines.size===0;
@@ -710,16 +715,30 @@ function renderLines(){
   $("#btnAllOn").textContent = f ? "Treffer an" : "Alle an";
   $("#btnAllOff").textContent = f ? "Treffer aus" : "Alle aus";
   const rows=arr.slice(0,MAX_ROWS);
-  $("#lineList").innerHTML = (rows.length ? rows.map(l=>`<div class="opt">
-      <button type="button" class="linego" data-go="${l.id}" title="Auf der Karte zeigen"><span class="swatch" style="background:${l.color}"></span><span class="ref">${esc(l.ref)}</span><span class="lbl"><span class="lname">${esc(l.name)}</span></span></button>
-      <span class="toggle"><input type="checkbox" data-line="${l.id}" aria-label="Strecke ${esc(l.ref)} anzeigen" ${l.on?"checked":""}><i></i></span></div>`).join("")
+  $("#lineList").innerHTML = (rows.length ? rows.map(l=>`<label class="opt linerow" data-row="${l.id}">
+      <span class="swatch" style="background:${l.color}"></span><span class="ref">${esc(l.ref)}</span><span class="lbl"><span class="lname">${esc(shortName(l))}</span></span>
+      <button type="button" class="iconbtn" data-go="${l.id}" aria-label="Strecke ${esc(l.ref)} auf der Karte zeigen" title="Auf der Karte zeigen">${showIcon}</button>
+      <span class="toggle"><input type="checkbox" data-line="${l.id}" aria-label="Strecke ${esc(l.ref)} anzeigen" ${l.on?"checked":""}><i></i></span></label>`).join("")
     : `<div class="opt"><span class="hint">Keine Strecke gefunden.</span></div>`)
     + (arr.length>MAX_ROWS ? `<div class="opt"><span class="hint">${arr.length-MAX_ROWS} weitere – tippe eine Nummer oder einen Ort ins Suchfeld.</span></div>` : "");
 }
 let filterT; $("#lineFilter").oninput=()=>{clearTimeout(filterT);filterT=setTimeout(renderLines,120);};
 $("#lineList").addEventListener("change",e=>{const l=lines.get(+e.target.dataset.line);if(l){l.on=e.target.checked;saveLineOff();refreshLinesUI();}});
+/* Ganze Zeile antippen schaltet um; nach rechts wischen = an, nach links = aus */
+let swipe=null;
+$("#lineList").addEventListener("touchstart",e=>{const r=e.target.closest("[data-row]"); if(r) swipe={id:+r.dataset.row,x:e.touches[0].clientX,y:e.touches[0].clientY,done:false};},{passive:true});
+$("#lineList").addEventListener("touchmove",e=>{
+  if(!swipe||swipe.done) return;
+  const dx=e.touches[0].clientX-swipe.x, dy=e.touches[0].clientY-swipe.y;
+  if(Math.abs(dx)>40&&Math.abs(dx)>Math.abs(dy)*1.5){
+    const l=lines.get(swipe.id); swipe.done=true;
+    if(l&&l.on!==(dx>0)){l.on=dx>0;saveLineOff();vibrate(10);refreshLinesUI();}
+  }
+},{passive:true});
+$("#lineList").addEventListener("touchend",e=>{if(swipe&&swipe.done) e.preventDefault(); swipe=null;});
 $("#lineList").addEventListener("click",e=>{
   const go=e.target.closest("[data-go]"); if(!go) return;
+  e.preventDefault();
   const l=lines.get(+go.dataset.go); if(!l) return;
   if(!l.on){l.on=true;saveLineOff();refreshLinesUI();}
   fitLine(l);
