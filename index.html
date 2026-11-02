@@ -219,6 +219,15 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .tour-dots i.on{background:var(--red);width:20px;border-radius:4px}
 .tour-nav{display:flex;align-items:center;gap:8px}
 .tour-nav .spacer{flex:1}
+.nearby{position:fixed;z-index:26;left:max(10px,env(safe-area-inset-left,0px));right:max(10px,env(safe-area-inset-right,0px));
+  top:calc(env(safe-area-inset-top,0px) + 64px);max-width:460px;margin:0 auto;background:var(--white);border-radius:14px;box-shadow:var(--shadow);
+  display:flex;align-items:center;gap:10px;padding:10px 8px 10px 12px;animation:slidein .35s var(--ease);border-left:5px solid var(--red)}
+@keyframes slidein{from{transform:translateY(-20px);opacity:0}}
+.nearby .tag{min-width:34px;height:30px}
+.nbtext{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.nbtext b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nbtext small{color:var(--muted);font-size:12.5px}
+.nearby .x{width:32px;height:32px;flex:none}
 .toast{position:fixed;z-index:60;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);
   transform:translate(-50%,20px);opacity:0;transition:all .3s var(--ease);pointer-events:none;
   background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-weight:600;max-width:calc(100% - 110px);text-align:center;box-shadow:var(--shadow)}
@@ -333,6 +342,16 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
     <div class="group" id="demoSwitch" hidden><h3>Demo: Person wechseln</h3>
       <p class="hint" style="margin-bottom:10px">Ohne Datenbank läuft die App nur auf diesem Gerät. Wechsle die Person, um die Rechte auszuprobieren.</p>
       <div class="list" id="demoUsers"></div></div>
+    <div class="group"><h3>Hinweise in der Nähe</h3>
+      <p class="hint" style="margin-bottom:10px">Meldet sich, wenn du an eine Anlage herankommst. Funktioniert, solange die App geöffnet ist.</p>
+      <div class="list">
+        <label class="opt"><span class="lbl">Hinweise einschalten</span><span class="toggle"><input type="checkbox" id="nbOn"><i></i></span></label>
+        <label class="opt"><span class="lbl">Umkreis</span><select id="nbRadius" class="minisel"><option value="150">150 m</option><option value="300">300 m</option><option value="500">500 m</option><option value="1000">1 km</option></select></label>
+        <label class="opt" id="nbSysRow"><span class="lbl">Auch als Mitteilung<br><small>Banner des Handys, wenn die App im Hintergrund noch offen ist</small></span><span class="toggle"><input type="checkbox" id="nbSys"><i></i></span></label>
+      </div>
+      <h3 style="margin-top:14px">Bei diesen Arten</h3>
+      <div class="list" id="nbTypes"></div>
+    </div>
     <div class="group" id="teamBox" hidden><h3>Team &amp; Rollen</h3>
       <p class="hint" style="margin-bottom:10px">Neue Konten warten auf Freischaltung. Hinzufügen darf jeder, entfernen nur Admins.</p>
       <div class="list" id="teamList"></div></div>
@@ -423,6 +442,13 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
       <button class="btn primary" type="button" id="tourNext">Weiter</button>
     </div>
   </div>
+</div>
+
+<div class="nearby" id="nearby" hidden role="status">
+  <span class="tag" id="nbTag"></span>
+  <div class="nbtext"><b id="nbTitle"></b><small id="nbSub"></small></div>
+  <button class="btn small primary" type="button" id="nbShow">Zeigen</button>
+  <button class="x" type="button" id="nbClose" aria-label="Hinweis schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1028,19 +1054,26 @@ function onPos(p){
   const h=locMarker.getElement().querySelector(".me-head");
   if(p.coords.heading!=null && !isNaN(p.coords.heading) && (p.coords.speed||0)>0.7){h.hidden=false; toHead=p.coords.heading;}
   else if((p.coords.speed||0)<0.3){h.hidden=true; toHead=null; curHead=null; locMarker.setRotation(0);}
-  if(firstFix){firstFix=false; goToMe(ll);}
+  if(firstFix){firstFix=false; if(flyOnFix) goToMe(ll);}
+  checkNearby(ll);
   if(!rafId) rafId=requestAnimationFrame(tick);
 }
+let flyOnFix=true;
+function startWatch(fly){
+  if(!navigator.geolocation){toast("Dein Gerät unterstützt keine Standortabfrage");return false;}
+  if(watchId!==null) return true;
+  firstFix=true; flyOnFix=fly;
+  watchId=navigator.geolocation.watchPosition(onPos,err=>{
+    toast(err.code===1?"Standort nicht erlaubt. Bitte im Browser freigeben.":"Standort gerade nicht verfügbar");
+    if(err.code===1){navigator.geolocation.clearWatch(watchId);watchId=null;setFollow(false);}
+  },{enableHighAccuracy:true,maximumAge:2000,timeout:20000});
+  return true;
+}
 $("#btnLocate").onclick=()=>{
-  if(!navigator.geolocation){toast("Dein Gerät unterstützt keine Standortabfrage");return;}
   setFollow(true);
-  if(watchId===null){
-    firstFix=true;
-    watchId=navigator.geolocation.watchPosition(onPos,err=>{
-      toast(err.code===1?"Standort nicht erlaubt. Bitte im Browser freigeben.":"Standort gerade nicht verfügbar");
-      if(err.code===1){navigator.geolocation.clearWatch(watchId);watchId=null;setFollow(false);}
-    },{enableHighAccuracy:true,maximumAge:2000,timeout:20000});
-  } else if(lastLL){ goToMe(lastLL); }
+  if(watchId===null){ startWatch(true); }
+  else if(lastLL){ goToMe(lastLL); }
+  else flyOnFix=true, firstFix=true;
 };
 map.on("dragstart",()=>{setFollow(false);flying=false;});
 
@@ -1204,6 +1237,66 @@ $("#btnTour").onclick=startTour;
 window.addEventListener("resize",()=>{if(!$("#tour").hidden) showTourStep();});
 document.addEventListener("keydown",e=>{if($("#tour").hidden)return; if(e.key==="ArrowRight")$("#tourNext").click(); if(e.key==="ArrowLeft")$("#tourBack").click(); if(e.key==="Escape")endTour();});
 
+/* ============ HINWEISE IN DER NÄHE ============ */
+const nb=Object.assign({on:false,radius:"300",sys:false,types:{estw:true,gsmr:true,rsto:true,mech:true,uw:true,dienst:true}},store.get("sa_nearby",{}));
+const nbSeen=new Map();           // Objekt-ID -> Zeitpunkt des letzten Hinweises
+const NB_REPEAT=45*60*1000;       // derselbe Hinweis frühestens nach 45 Minuten wieder
+const saveNb=()=>store.set("sa_nearby",nb);
+function renderNbSettings(){
+  $("#nbOn").checked=nb.on; $("#nbRadius").value=nb.radius; $("#nbSys").checked=nb.sys;
+  $("#nbSysRow").hidden=!("Notification" in window);
+  $("#nbTypes").innerHTML=Object.entries(TYPES).map(([k,t])=>`<label class="opt"><span class="tag" style="background:${t.color}">${tagInner(t)}</span><span class="lbl">${t.label}</span>${toggle("data-nbtype",k,!!nb.types[k])}</label>`).join("");
+}
+renderNbSettings();
+$("#nbOn").onchange=e=>{nb.on=e.target.checked;saveNb();
+  if(nb.on){ if(startWatch(false)) toast("Hinweise an: Du bekommst eine Meldung, wenn du in die Nähe kommst"); if(lastLL) checkNearby(lastLL);} };
+$("#nbRadius").onchange=e=>{nb.radius=e.target.value;saveNb();};
+$("#nbTypes").addEventListener("change",e=>{const k=e.target.dataset.nbtype;if(k){nb.types[k]=e.target.checked;saveNb();}});
+$("#nbSys").onchange=async e=>{
+  nb.sys=e.target.checked;
+  if(nb.sys && Notification.permission!=="granted"){
+    try{const r=await Notification.requestPermission(); if(r!=="granted"){nb.sys=false;e.target.checked=false;toast("Mitteilungen wurden nicht erlaubt");}}
+    catch{nb.sys=false;e.target.checked=false;toast("Mitteilungen werden hier nicht unterstützt");}
+  }
+  saveNb();
+};
+let swReg=null;
+if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").then(r=>swReg=r).catch(()=>{});}
+
+function distM(a,b){const k=111320,kx=k*Math.cos(a[1]*Math.PI/180);return Math.hypot((a[0]-b[0])*kx,(a[1]-b[1])*k);}
+let nbCurrent=null, nbLastCheck=0;
+function checkNearby(ll){
+  if(!nb.on||!me||me.role==="wartend") return;
+  const now=Date.now(); if(now-nbLastCheck<4000) return; nbLastCheck=now;
+  const r=+nb.radius;
+  const hits=markers.filter(m=>nb.types[m.typ]).map(m=>({m,d:distM(ll,[m.lng,m.lat])}))
+    .filter(h=>h.d<=r && (!nbSeen.has(h.m.id)||now-nbSeen.get(h.m.id)>NB_REPEAT)).sort((a,b)=>a.d-b.d);
+  if(!hits.length) return;
+  hits.forEach(h=>nbSeen.set(h.m.id,now));
+  showNearby(hits[0].m,hits[0].d,hits.length-1);
+}
+function showNearby(m,d,more){
+  const t=TYPES[m.typ]||TYPES.sonst; nbCurrent=m;
+  $("#nbTag").innerHTML=tagInner(t); $("#nbTag").style.background=t.color;
+  $("#nbTitle").textContent=m.titel;
+  const dist=d<1000?`${Math.round(d/10)*10} m`:`${(d/1000).toLocaleString("de-DE",{maximumFractionDigits:1})} km`;
+  $("#nbSub").textContent=`${t.label} · ${dist} entfernt${more>0?` · +${more} weitere`:""}`;
+  $("#nearby").hidden=false; vibrate([60,40,60]);
+  clearTimeout(showNearby.t); showNearby.t=setTimeout(()=>{$("#nearby").hidden=true;},20000);
+  if(nb.sys && "Notification" in window && Notification.permission==="granted" && document.visibilityState!=="visible"){
+    const body=`${t.label} · ${dist} entfernt`;
+    try{ if(swReg) swReg.showNotification(m.titel,{body,tag:"nb-"+m.id,icon:"icons/icon-192.png",badge:"icons/icon-192.png"});
+         else new Notification(m.titel,{body,tag:"nb-"+m.id,icon:"icons/icon-192.png"}); }catch{}
+  }
+}
+$("#nbClose").onclick=()=>{$("#nearby").hidden=true;};
+$("#nbShow").onclick=()=>{
+  $("#nearby").hidden=true; if(!nbCurrent) return; setFollow(false);
+  const m=nbCurrent; map.flyTo({center:[m.lng,m.lat],zoom:Math.max(map.getZoom(),17),duration:900});
+  openPopup&&openPopup.remove();
+  openPopup=new maplibregl.Popup({offset:[0,-40],maxWidth:"290px"}).setLngLat([m.lng,m.lat]).setHTML(popupHtml(m)).addTo(map);
+};
+
 async function start(){
   me = await api.me();
   if(recovering) return;
@@ -1217,6 +1310,7 @@ async function start(){
   if(!subscribed){api.subscribe(()=>refreshMarkers());subscribed=true;}
   if(api.demo && !store.get("sa_demo_seen",false)){store.set("sa_demo_seen",true);toast("Demo-Modus: Daten bleiben nur auf diesem Gerät");}
   if(!store.get(tourKey(),false)) setTimeout(startTour,700);
+  if(nb.on) startWatch(false);
 }
 start();
 </script>
