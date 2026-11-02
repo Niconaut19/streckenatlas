@@ -185,6 +185,14 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .iconbtn svg{width:16px;height:16px;stroke:currentColor;stroke-width:2.4;fill:none;stroke-linecap:round}
 .chips{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 2px}
 .chip-ref{color:#fff;font-weight:800;font-size:12px;padding:2px 8px;border-radius:6px;font-variant-numeric:tabular-nums;letter-spacing:.03em}
+.fold summary{list-style:none;display:flex;align-items:center;gap:8px;cursor:pointer;padding:12px 0;border-bottom:1px solid var(--grey-1);-webkit-user-select:none;user-select:none}
+.fold summary::-webkit-details-marker{display:none}
+.fold summary h3{margin:0;font-size:15px;color:var(--ink);font-weight:700;flex:1}
+.fold .sumnote{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.fold .chev{width:20px;height:20px;stroke:var(--muted);stroke-width:2.4;fill:none;stroke-linecap:round;stroke-linejoin:round;transition:transform .25s var(--ease)}
+.fold[open] .chev{transform:rotate(180deg)}
+.fold .foldbody{padding-top:12px}
+.sheet .body:has(.fold){gap:0}
 .toast{position:fixed;z-index:60;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);
   transform:translate(-50%,20px);opacity:0;transition:all .3s var(--ease);pointer-events:none;
   background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-weight:600;max-width:calc(100% - 110px);text-align:center;box-shadow:var(--shadow)}
@@ -248,19 +256,19 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
   <div class="grab"></div>
   <header><h2>Karte</h2><button class="x" data-close aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
   <div class="body">
-    <div class="group"><h3>Kartengrundlage</h3>
+    <details class="group fold" data-fold="base" open><summary><h3>Kartengrundlage</h3><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="foldbody">
       <div class="seg">
         <label><input type="radio" name="base" value="sat" id="baseSat">Satellit</label>
         <label><input type="radio" name="base" value="satlab" id="baseSatLab">Mit Orten</label>
         <label><input type="radio" name="base" value="osm" id="baseOsm">Straße</label>
       </div>
-    </div>
-    <div class="group"><h3>Bahnanlagen an deinen Strecken</h3><div class="list">
+    </div></details>
+    <details class="group fold" data-fold="pts"><summary><h3>Bahnanlagen an deinen Strecken</h3><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="foldbody"><div class="list">
       <label class="opt"><span class="tag" style="background:#fff;border:3px solid #ec0016;min-width:18px;height:18px;padding:0;border-radius:50%"></span><span class="lbl">Bahnhöfe &amp; Betriebsstellen<br><small>mit DS100-Kürzel</small></span><span class="toggle"><input type="checkbox" id="ptsBst" data-pts="bst"><i></i></span></label>
       <label class="opt"><span class="tag" style="background:#f39200;min-width:14px;height:14px;padding:0;border-radius:50%"></span><span class="lbl">Bahnübergänge<br><small>ab näherem Zoom</small></span><span class="toggle"><input type="checkbox" id="ptsBue" data-pts="bue"><i></i></span></label>
-    </div></div>
-    <div class="group"><h3>Bahn-Ebenen</h3><div class="list" id="ormList"></div><p class="hint" style="margin-top:8px">„Alle Gleise“ zeigt das gesamte Gleisnetz, unabhängig von deiner Streckenauswahl unten.</p></div>
-    <div class="group"><h3>Strecken in Bayern</h3>
+    </div></div></details>
+    <details class="group fold" data-fold="orm"><summary><h3>Bahn-Ebenen</h3><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="foldbody"><div class="list" id="ormList"></div><p class="hint" style="margin-top:8px">„Alle Gleise“ zeigt das gesamte Gleisnetz, unabhängig von deiner Streckenauswahl unten.</p></div></details>
+    <details class="group fold" data-fold="lines"><summary><h3>Strecken in Bayern</h3><span class="sumnote" id="linesSum"></span><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="foldbody">
       <p class="hint" id="linesHint">Streckendaten werden geladen …</p>
       <div id="linesBox" hidden class="stack">
         <div class="field search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="lineFilter" type="search" enterkeyhint="search" autocomplete="off" placeholder="Nummer oder Name, z. B. 5300 oder München" aria-label="Strecken suchen"></div>
@@ -272,8 +280,8 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
         </div>
         <p class="hint" id="lineFilterInfo"></p>
       </div>
-    </div>
-    <div class="group"><h3>Erfasste Objekte</h3><div class="list" id="typeList"></div></div>
+    </div></details>
+    <details class="group fold" data-fold="types"><summary><h3>Erfasste Objekte</h3><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="foldbody"><div class="list" id="typeList"></div></div></details>
   </div>
 </section>
 
@@ -523,6 +531,12 @@ $("#ormList").addEventListener("change",e=>{const k=e.target.dataset.orm;if(k){o
 
 map.on("load",()=>{setBase(savedBase);applyOrm();updateLinesSource();});
 
+/* Aufklappbare Bereiche merken */
+const folds=store.get("sa_folds",{});
+document.querySelectorAll("details[data-fold]").forEach(d=>{
+  if(d.dataset.fold in folds) d.open=folds[d.dataset.fold];
+  d.addEventListener("toggle",()=>{folds[d.dataset.fold]=d.open;store.set("sa_folds",folds);});
+});
 /* ============ STRECKEN IN BAYERN (fest hinterlegt, monatlich aktualisiert) ============ */
 const lines = new Map();
 const lineOff = store.get("sa_by_off",{});        // ausgeschaltete Strecken
@@ -613,6 +627,7 @@ function renderLines(){
   const arr=visibleLines(), f=$("#lineFilter").value.trim(), onCount=[...lines.values()].filter(l=>l.on).length;
   $("#linesHint").hidden=lines.size>0; $("#linesBox").hidden=lines.size===0;
   $("#linesCount").textContent = f ? `${arr.length} Treffer` : `${onCount} von ${lines.size} an`;
+  $("#linesSum").textContent=`${onCount} von ${lines.size} an`;
   $("#btnAllOn").textContent = f ? "Treffer an" : "Alle an";
   $("#btnAllOff").textContent = f ? "Treffer aus" : "Alle aus";
   const rows=arr.slice(0,MAX_ROWS);
