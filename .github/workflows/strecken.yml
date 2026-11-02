@@ -24,12 +24,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Strecken aus OpenStreetMap laden
-        run: python3 scripts/build_strecken.py data/strecken-bayern.geojson data/punkte-bayern.geojson
+        run: python3 scripts/build_strecken.py data/strecken-bayern.geojson data/punkte-bayern.geojson data/km-bayern.geojson
       - name: Speichern, falls sich etwas geändert hat
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898783+github-actions[bot]@users.noreply.github.com"
-          git add data/strecken-bayern.geojson data/punkte-bayern.geojson
+          git add data/strecken-bayern.geojson data/punkte-bayern.geojson data/km-bayern.geojson
           if git diff --cached --quiet; then
             echo "Keine Änderungen"
           else

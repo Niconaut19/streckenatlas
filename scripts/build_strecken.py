@@ -36,6 +36,12 @@ POINTS_QUERY = (
     ');'
     'out;'
 )
+KM_QUERY = (
+    '[out:json][timeout:900];'
+    'area["ISO3166-2"="DE-BY"]->.by;'
+    'node["railway"="milestone"](area.by);'
+    'out;'
+)
 SKIP_STATION = {"subway", "monorail", "funicular", "tram"}
 
 
@@ -176,6 +182,34 @@ def build_points(data):
     return {"type": "FeatureCollection", "attribution": "© OpenStreetMap-Mitwirkende, ODbL", "features": feats}
 
 
+def parse_km(v):
+    if not v:
+        return None
+    v = v.strip().replace(",", ".").split(";")[0]
+    if v.startswith("mi:"):
+        return None
+    try:
+        if "+" in v:  # z. B. "12.3+45" -> 12.345
+            a, b = v.split("+", 1)
+            return round(float(a) + float(b) / 1000, 3)
+        return float(v)
+    except ValueError:
+        return None
+
+
+def build_km(data):
+    feats = []
+    for n in data.get("elements", []):
+        t = n.get("tags", {})
+        km = parse_km(t.get("railway:position:exact")) or parse_km(t.get("railway:position"))
+        if km is None:
+            continue
+        km = round(km, 1)
+        feats.append({"type": "Feature", "properties": {"k": int(km) if km == int(km) else km},
+                      "geometry": {"type": "Point", "coordinates": [round(n["lon"], 5), round(n["lat"], 5)]}})
+    return {"type": "FeatureCollection", "attribution": "© OpenStreetMap-Mitwirkende, ODbL", "features": feats}
+
+
 def write(fc, out):
     import os
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
@@ -191,6 +225,11 @@ if __name__ == "__main__":
     if len(pts["features"]) < 500:
         sys.exit(f"Nur {len(pts['features'])} Bahnanlagen gefunden, Datei wird nicht überschrieben")
     write(pts, pts_out)
+    km_out = sys.argv[3] if len(sys.argv) > 3 else "data/km-bayern.geojson"
+    km = build_km(fetch(KM_QUERY))
+    if len(km["features"]) < 500:
+        sys.exit(f"Nur {len(km['features'])} Kilometersteine gefunden, Datei wird nicht überschrieben")
+    write(km, km_out)
     fc = build(fetch())
     if len(fc["features"]) < 50:
         sys.exit(f"Nur {len(fc['features'])} Strecken gefunden, Datei wird nicht überschrieben")

@@ -193,6 +193,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .fold[open] .chev{transform:rotate(180deg)}
 .fold .foldbody{padding-top:12px}
 .sheet .body:has(.fold){gap:0}
+.kmbig{font-weight:600;color:var(--muted);font-size:15px;font-variant-numeric:tabular-nums}
 .toast{position:fixed;z-index:60;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);
   transform:translate(-50%,20px);opacity:0;transition:all .3s var(--ease);pointer-events:none;
   background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-weight:600;max-width:calc(100% - 110px);text-align:center;box-shadow:var(--shadow)}
@@ -265,6 +266,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
     </div></details>
     <details class="group fold" data-fold="pts"><summary><h3>Bahnanlagen an deinen Strecken</h3><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="foldbody"><div class="list">
       <label class="opt"><span class="tag" style="background:#fff;border:3px solid #ec0016;min-width:18px;height:18px;padding:0;border-radius:50%"></span><span class="lbl">Bahnhöfe &amp; Betriebsstellen<br><small>mit DS100-Kürzel</small></span><span class="toggle"><input type="checkbox" id="ptsBst" data-pts="bst"><i></i></span></label>
+      <label class="opt"><span class="tag" style="background:#fff;border:2px solid #282d37;min-width:12px;height:12px;padding:0;border-radius:50%"></span><span class="lbl">Kilometrierung<br><small>ganze km ab Ortsebene, alle beim Hineinzoomen</small></span><span class="toggle"><input type="checkbox" id="ptsKm" data-km="1"><i></i></span></label>
       <label class="opt"><span class="tag" style="background:#f39200;min-width:14px;height:14px;padding:0;border-radius:50%"></span><span class="lbl">Bahnübergänge<br><small>ab näherem Zoom</small></span><span class="toggle"><input type="checkbox" id="ptsBue" data-pts="bue"><i></i></span></label>
     </div></div></details>
     <details class="group fold" data-fold="orm"><summary><h3>Bahn-Ebenen</h3><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="foldbody"><div class="list" id="ormList"></div><p class="hint" style="margin-top:8px">„Alle Gleise“ zeigt das gesamte Gleisnetz, unabhängig von deiner Streckenauswahl unten.</p></div></details>
@@ -466,7 +468,8 @@ const sources = {
   labels:{type:"raster",tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"],tileSize:256,maxzoom:19},
   osm:{type:"raster",tiles:["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],tileSize:256,maxzoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'},
   lines:{type:"geojson",data:emptyFC},
-  pts:{type:"geojson",data:emptyFC}
+  pts:{type:"geojson",data:emptyFC},
+  km:{type:"geojson",data:emptyFC}
 };
 ORM.forEach(o=>sources["orm-"+o.key]={type:"raster",tiles:["a","b","c"].map(s=>`https://${s}.tiles.openrailwaymap.org/${o.key}/{z}/{x}/{y}.png`),tileSize:256,maxzoom:19,attribution:ormAttr});
 
@@ -485,6 +488,10 @@ const map = new maplibregl.Map({
       layout:{"symbol-placement":"line","symbol-spacing":320,"text-field":["get","ref"],"text-font":["Open Sans Semibold"],
         "text-size":["interpolate",["linear"],["zoom"],9,11,15,14],"text-letter-spacing":0.05,"text-keep-upright":true,"text-padding":4},
       paint:{"text-color":"#ffffff","text-halo-color":["get","color"],"text-halo-width":3}},
+    {id:"km-full",type:"circle",source:"km",minzoom:12.5,filter:["==",["%",["get","k"],1],0],paint:{"circle-radius":3.5,"circle-color":"#ffffff","circle-stroke-color":"#282d37","circle-stroke-width":1.5}},
+    {id:"km-full-label",type:"symbol",source:"km",minzoom:12.5,filter:["==",["%",["get","k"],1],0],layout:{"text-field":["concat","km ",["number-format",["get","k"],{"locale":"de-DE","min-fraction-digits":0,"max-fraction-digits":1}]],"text-font":["Open Sans Semibold"],"text-size":11.5,"text-anchor":"left","text-offset":[0.7,0],"text-optional":true},paint:{"text-color":"#282d37","text-halo-color":"#ffffff","text-halo-width":1.6}},
+    {id:"km-sub",type:"circle",source:"km",minzoom:15,filter:["!=",["%",["get","k"],1],0],paint:{"circle-radius":2.5,"circle-color":"#ffffff","circle-stroke-color":"#282d37","circle-stroke-width":1.5}},
+    {id:"km-sub-label",type:"symbol",source:"km",minzoom:15,filter:["!=",["%",["get","k"],1],0],layout:{"text-field":["concat","km ",["number-format",["get","k"],{"locale":"de-DE","min-fraction-digits":1,"max-fraction-digits":1}]],"text-font":["Open Sans Semibold"],"text-size":10,"text-anchor":"left","text-offset":[0.7,0],"text-optional":true},paint:{"text-color":"#282d37","text-halo-color":"#ffffff","text-halo-width":1.6}},
     {id:"bue",type:"circle",source:"pts",minzoom:12,filter:["==",["get","t"],"bue"],
       paint:{"circle-radius":["interpolate",["linear"],["zoom"],12,3,16,6],"circle-color":"#f39200","circle-stroke-color":"#ffffff","circle-stroke-width":1.5}},
     {id:"bst",type:"circle",source:"pts",filter:["==",["get","t"],"bst"],
@@ -589,7 +596,37 @@ async function loadPoints(){
   catch{}
 }
 map.on("load",loadPoints);
+let allKm=[];
+async function loadKm(){
+  try{const r=await fetch("data/km-bayern.geojson",{cache:"no-cache"}); if(!r.ok) return; allKm=(await r.json()).features; lines.forEach(l=>l.km=null); updatePoints();}
+  catch{}
+}
+map.on("load",loadKm);
+function lineKm(l){
+  if(l.km) return l.km;
+  const b=lineBox(l), c=l.feature.geometry.coordinates;
+  return l.km=allKm.filter(f=>{const [x,y]=f.geometry.coordinates; return x>=b[0]&&x<=b[2]&&y>=b[1]&&y<=b[3]&&distToLineM(y,x,c)<=35;});
+}
+/* Ungefährer Bahnkilometer an einem Punkt, aus den nächsten Kilometersteinen der Strecke */
+function kmAt(lat,lng,l){
+  const c=lineKm(l); if(!c.length) return null;
+  const k=111320, kx=k*Math.cos(lat*Math.PI/180);
+  const arr=c.map(f=>{const [x,y]=f.geometry.coordinates; return {km:f.properties.k,x:(x-lng)*kx,y:(y-lat)*k};})
+    .map(o=>(o.d=Math.hypot(o.x,o.y),o)).filter(o=>o.d<3000).sort((a,b)=>a.d-b.d);
+  if(!arr.length) return null;
+  const a=arr[0], b=arr.find(o=>Math.abs(o.km-a.km)>0.05);
+  if(!b) return a.d<150?a.km:null;
+  const ab=Math.hypot(a.x-b.x,a.y-b.y), dir=Math.sign(b.km-a.km)||1;
+  if(a.d+b.d<=ab*1.25) return a.km+(b.km-a.km)*a.d/(a.d+b.d);
+  return a.km-dir*a.d/1000;
+}
+const fmtKm=v=>"km "+v.toLocaleString("de-DE",{minimumFractionDigits:1,maximumFractionDigits:1});
 $("#ptsBst").checked=ptsOn.bst!==false; $("#ptsBue").checked=ptsOn.bue!==false;
+const kmOn=()=>store.get("sa_km",true);
+$("#ptsKm").checked=kmOn();
+const applyKmVis=()=>["km-full","km-full-label","km-sub","km-sub-label"].forEach(id=>setVis(id,kmOn()));
+$("#ptsKm").onchange=e=>{store.set("sa_km",e.target.checked);applyKmVis();};
+map.on("load",applyKmVis);
 document.querySelectorAll("[data-pts]").forEach(cb=>cb.onchange=()=>{ptsOn[cb.dataset.pts]=cb.checked;store.set("sa_pts",ptsOn);updatePoints();});
 
 function nearLineRefs(lat,lng,r){
@@ -598,7 +635,7 @@ function nearLineRefs(lat,lng,r){
     if(lng>=b[0]&&lng<=b[2]&&lat>=b[1]&&lat<=b[3]&&distToLineM(lat,lng,l.feature.geometry.coordinates)<=r) out.push(l); });
   return out.sort(byRef);
 }
-const refChips = ls => ls.length ? `<div class="chips">${ls.map(l=>`<span class="chip-ref" style="background:${l.color}">${esc(l.ref)}</span>`).join("")}</div>` : "";
+const refChips = (ls,lat,lng) => ls.length ? `<div class="chips">${ls.map(l=>{const k=lat!=null?kmAt(lat,lng,l):null; return `<span class="chip-ref" style="background:${l.color}">${esc(l.ref)}${k!=null?` · ${fmtKm(k)}`:""}</span>`;}).join("")}</div>` : "";
 function lineBox(l){
   if(l.box) return l.box;
   let w=180,s=90,e=-180,n=-90;
@@ -616,6 +653,14 @@ function updatePoints(){
   else res=want.filter(f=>{const [x,y]=f.geometry.coordinates;
     return onLines.some(l=>{const b=lineBox(l); return x>=b[0]&&x<=b[2]&&y>=b[1]&&y<=b[3]&&distToLineM(y,x,l.feature.geometry.coordinates)<=150;});});
   src.setData({type:"FeatureCollection",features:res});
+  const ksrc=map.getSource("km");
+  if(ksrc){
+    let kres;
+    if(!lines.size||all) kres=allKm;
+    else if(!onLines.length) kres=[];
+    else { const set=new Set(); onLines.forEach(l=>lineKm(l).forEach(f=>set.add(f))); kres=[...set]; }
+    ksrc.setData({type:"FeatureCollection",features:kres});
+  }
 }
 
 function visibleLines(){
@@ -658,12 +703,13 @@ map.on("click",e=>{
   const f=hit.find(h=>h.layer.id==="bst")||hit.find(h=>h.layer.id==="bue")||hit[0];
   const p=f.properties; let html;
   if(f.layer.id==="lines-hit"){
-    html=`<div class="pop"><span class="t"><span class="swatch" style="background:${p.color}"></span>Strecke</span><h4>${esc(p.ref)}</h4><p>${esc(p.name)}</p></div>`;
+    const l=lines.get(+p.id), k=l?kmAt(e.lngLat.lat,e.lngLat.lng,l):null;
+    html=`<div class="pop"><span class="t"><span class="swatch" style="background:${p.color}"></span>Strecke</span><h4>${esc(p.ref)}${k!=null?` <span class="kmbig">${fmtKm(k)}</span>`:""}</h4><p>${esc(p.name)}</p>${k!=null?`<p class="meta">Kilometer ungefähr, aus den nächsten Kilometersteinen berechnet</p>`:""}</div>`;
   } else {
     const [lng,lat]=f.geometry.coordinates, m={lat,lng};
     const title = p.t==="bue" ? (p.n||"Bahnübergang") : (p.n||p.r);
     const kind = p.t==="bue" ? "Bahnübergang" : (BST_KIND[p.k]||"Betriebsstelle");
-    html=`<div class="pop"><span class="t">${esc(kind)}${p.r?` · DS100 <b>${esc(p.r)}</b>`:""}</span><h4>${esc(title)}</h4>${refChips(nearLineRefs(lat,lng,150))}${navLinks(m)}<p class="meta">${lat.toFixed(5)}, ${lng.toFixed(5)}</p></div>`;
+    html=`<div class="pop"><span class="t">${esc(kind)}${p.r?` · DS100 <b>${esc(p.r)}</b>`:""}</span><h4>${esc(title)}</h4>${refChips(nearLineRefs(lat,lng,150),lat,lng)}${navLinks(m)}<p class="meta">${lat.toFixed(5)}, ${lng.toFixed(5)}</p></div>`;
   }
   openPopup&&openPopup.remove();
   openPopup=new maplibregl.Popup({offset:10,maxWidth:"290px"}).setLngLat(f.geometry.type==="Point"?f.geometry.coordinates:e.lngLat).setHTML(html).addTo(map);
@@ -699,7 +745,7 @@ function navLinks(m){
 }
 function popupHtml(m){const t=TYPES[m.typ]||TYPES.sonst;const who=profiles[m.created_by]?.name||"Unbekannt";
   return `<div class="pop"><span class="t"><span class="tag" style="background:${t.color}">${esc(t.short)}</span>${esc(t.label)}</span><h4>${esc(m.titel)}</h4>
-  ${refChips(nearLineRefs(m.lat,m.lng,300))}
+  ${refChips(nearLineRefs(m.lat,m.lng,300),m.lat,m.lng)}
   ${m.notiz?`<p>${esc(m.notiz).replace(/\n/g,"<br>")}</p>`:""}
   ${navLinks(m)}
   <p class="meta">Erfasst von ${esc(who)} am ${fmtDate(m.created_at)}<br>${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}${canDelete(m)?"<br>Zum Entfernen den Pin lange drücken.":""}</p></div>`;}
