@@ -31,8 +31,7 @@ Den Link unter **Supabase → Authentication → URL Configuration** als *Site U
 |---|---|---|---|
 | Karte & Objekte sehen | – | ✓ | ✓ |
 | Objekte hinzufügen | – | ✓ | ✓ |
-| Eigene Objekte entfernen | – | ✓ | ✓ |
-| Fremde Objekte entfernen | – | – | ✓ |
+| Objekte entfernen | – | – | ✓ |
 | Kollegen freischalten / Rollen ändern | – | – | ✓ |
 
 ## Gut zu wissen

@@ -157,6 +157,20 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .linkbtn{background:none;border:0;color:var(--ink-2);text-decoration:underline;cursor:pointer;padding:4px;align-self:center;font-size:14px;font-weight:600}
 
 /* Toast */
+.modal{position:fixed;inset:0;z-index:55;display:grid;place-items:center;background:rgba(40,45,55,.45);
+  padding:20px max(16px,env(safe-area-inset-right,0px)) 20px max(16px,env(safe-area-inset-left,0px));animation:fade .2s}
+.modal .card{animation:pop .25s var(--ease)}
+@keyframes fade{from{opacity:0}}
+@keyframes pop{from{transform:scale(.94);opacity:0}}
+.csum{display:flex;gap:12px;align-items:center;background:var(--grey-1);border-radius:10px;padding:12px}
+.csum .tag{min-width:36px;height:30px;font-size:12px}
+.csum div{display:flex;flex-direction:column;min-width:0}
+.csum b{font-size:16px;overflow-wrap:anywhere}
+.csum small{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.navbtn{display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;margin:10px 0 4px;font-size:14px;color:var(--ink)}
+.navbtn.primary{color:#fff}
+.navrow{display:flex;gap:8px}
+.navrow .navbtn{flex:1;padding:10px 8px}
 .toast{position:fixed;z-index:60;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);
   transform:translate(-50%,20px);opacity:0;transition:all .3s var(--ease);pointer-events:none;
   background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-weight:600;max-width:calc(100% - 110px);text-align:center;box-shadow:var(--shadow)}
@@ -254,7 +268,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
       <p class="hint" style="margin-bottom:10px">Ohne Datenbank läuft die App nur auf diesem Gerät. Wechsle die Person, um die Rechte auszuprobieren.</p>
       <div class="list" id="demoUsers"></div></div>
     <div class="group" id="teamBox" hidden><h3>Team &amp; Rollen</h3>
-      <p class="hint" style="margin-bottom:10px">Neue Konten warten auf Freischaltung. Admins dürfen Objekte aller Kolleginnen und Kollegen entfernen.</p>
+      <p class="hint" style="margin-bottom:10px">Neue Konten warten auf Freischaltung. Hinzufügen darf jeder, entfernen nur Admins.</p>
       <div class="list" id="teamList"></div></div>
     <button class="btn block" id="btnLogout">Abmelden</button>
   </div>
@@ -293,6 +307,16 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
     <p class="hint">Dein Konto ist angelegt. Ein Admin muss es noch freischalten, danach siehst du die Karte.</p>
     <button class="btn primary block" id="btnRecheck">Erneut prüfen</button>
     <button class="btn block" id="btnLogout2">Abmelden</button>
+  </div>
+</div>
+
+<div class="modal" id="confirmAdd" hidden role="dialog" aria-modal="true" aria-labelledby="cHead">
+  <div class="card">
+    <h2 id="cHead">Wirklich hinzufügen?</h2>
+    <div class="csum"><span class="tag" id="cTag"></span><div><b id="cTitle"></b><small id="cType"></small><small id="cPos"></small></div></div>
+    <p class="hint">Das Objekt ist danach für alle Kolleginnen und Kollegen sichtbar. Entfernen kann es nur ein Admin.</p>
+    <button class="btn primary block" id="cYes">Ja, hinzufügen</button>
+    <button class="btn block" id="cBack">Zurück</button>
   </div>
 </div>
 
@@ -370,7 +394,7 @@ function demoBackend(){
     async listMarkers(){return markers;},
     async addMarker(m){markers.push({...m,id:crypto.randomUUID(),created_by:current,created_at:new Date().toISOString()});save();},
     async deleteMarker(id){const m=markers.find(x=>x.id===id);const u=users.find(x=>x.id===current);
-      if(!m) return; if(m.created_by!==current && u.role!=="admin") throw new Error("Keine Berechtigung"); markers=markers.filter(x=>x.id!==id);save();},
+      if(!m) return; if(u.role!=="admin") throw new Error("Keine Berechtigung"); markers=markers.filter(x=>x.id!==id);save();},
     async listProfiles(){return users;},
     async setRole(id,role){users.find(u=>u.id===id).role=role;saveUsers();},
     subscribe(){}
@@ -505,10 +529,22 @@ function renderTypeList(){
 }
 $("#typeList").addEventListener("change",e=>{const k=e.target.dataset.type;if(k){typeOn[k]=e.target.checked;store.set("sa_types",typeOn);drawMarkers();}});
 
-const canDelete = m => me && (m.created_by===me.id || me.role==="admin");
+/* Nur Admins dürfen löschen */
+const canDelete = m => !!me && me.role==="admin";
+const isApple = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) && "ontouchend" in document;
+function navLinks(m){
+  const ll=`${m.lat.toFixed(6)},${m.lng.toFixed(6)}`;
+  const google=`https://www.google.com/maps/dir/?api=1&destination=${ll}`;
+  const apple=`https://maps.apple.com/?daddr=${ll}&dirflg=d`;
+  const navIcon=`<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-8-8 18-2-8z"/></svg>`;
+  return isApple
+    ? `<div class="navrow"><a class="btn primary navbtn" href="${apple}" target="_blank" rel="noopener">${navIcon}Apple Karten</a><a class="btn navbtn" href="${google}" target="_blank" rel="noopener">Google Maps</a></div>`
+    : `<a class="btn primary block navbtn" href="${google}" target="_blank" rel="noopener">${navIcon}Navigation starten</a>`;
+}
 function popupHtml(m){const t=TYPES[m.typ]||TYPES.sonst;const who=profiles[m.created_by]?.name||"Unbekannt";
   return `<div class="pop"><span class="t"><span class="tag" style="background:${t.color}">${esc(t.short)}</span>${esc(t.label)}</span><h4>${esc(m.titel)}</h4>
   ${m.notiz?`<p>${esc(m.notiz).replace(/\n/g,"<br>")}</p>`:""}
+  ${navLinks(m)}
   <p class="meta">Erfasst von ${esc(who)} am ${fmtDate(m.created_at)}<br>${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}</p>
   ${canDelete(m)?`<button class="btn danger block" data-del="${esc(m.id)}">Entfernen</button>`:""}</div>`;}
 function drawMarkers(){
@@ -554,12 +590,21 @@ map.on("click",e=>{
 });
 function showCoords(){$("#addCoords").textContent=`Position ${pending.lat.toFixed(5)}, ${pending.lng.toFixed(5)} · Pin lässt sich verschieben`;}
 $("#typePick").addEventListener("change",()=>tempMarker&&(tempMarker.getElement().innerHTML=pinSvg(TYPES[pickedType()])));
-$("#addForm").onsubmit=async e=>{
+/* Erst Sicherheitsabfrage, dann speichern */
+$("#addForm").onsubmit=e=>{
   e.preventDefault(); if(!pending) return;
-  const btn=$("#addSave"); btn.disabled=true;
+  const t=TYPES[pickedType()];
+  $("#cTag").textContent=t.short; $("#cTag").style.background=t.color;
+  $("#cType").textContent=t.label; $("#cTitle").textContent=$("#fTitel").value.trim();
+  $("#cPos").textContent=`${pending.lat.toFixed(5)}, ${pending.lng.toFixed(5)}`;
+  $("#confirmAdd").hidden=false; vibrate(15); setTimeout(()=>$("#cBack").focus(),50);
+};
+$("#cBack").onclick=()=>{$("#confirmAdd").hidden=true;};
+$("#cYes").onclick=async()=>{
+  const btn=$("#cYes"); btn.disabled=true;
   try{
     await api.addMarker({lat:pending.lat,lng:pending.lng,typ:pickedType(),titel:$("#fTitel").value.trim(),notiz:$("#fNotiz").value.trim()||null});
-    closeSheets(); vibrate(20); toast("Objekt gespeichert"); await refreshMarkers();
+    $("#confirmAdd").hidden=true; closeSheets(); vibrate(20); toast("Objekt hinzugefügt"); await refreshMarkers();
   }catch(err){toast("Speichern fehlgeschlagen: "+err.message);}
   finally{btn.disabled=false;}
 };

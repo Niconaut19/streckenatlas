@@ -54,7 +54,7 @@ create policy "Rollen nur Admin"   on public.profiles for update to authenticate
 
 create policy "Objekte lesen"      on public.markers for select to authenticated using (is_member());
 create policy "Objekte anlegen"    on public.markers for insert to authenticated with check (is_member() and created_by = auth.uid());
-create policy "Objekte entfernen"  on public.markers for delete to authenticated using (created_by = auth.uid() or is_admin());
+create policy "Objekte entfernen"  on public.markers for delete to authenticated using (is_admin());
 
 -- Live-Aktualisierung, wenn Kollegen etwas eintragen
 alter publication supabase_realtime add table public.markers;
