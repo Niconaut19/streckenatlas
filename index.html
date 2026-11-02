@@ -260,6 +260,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right{bottom:env(safe-area-inset-bottom,0px)}
 .maplibregl-ctrl-bottom-left{left:env(safe-area-inset-left,0px)}
 .maplibregl-ctrl-attrib.maplibregl-compact{margin:0 0 14px 12px}
+.maplibregl-ctrl-attrib.maplibregl-compact:not(.maplibregl-compact-show){opacity:.55;transform:scale(.85);transform-origin:0 100%}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -604,6 +605,9 @@ const map = new maplibregl.Map({
 });
 map.touchZoomRotate.enableRotation();
 map.addControl(new maplibregl.AttributionControl({compact:true}),"bottom-left");
+/* Quellenangabe nur als kleines „i“, aufgeklappt wird sie erst beim Antippen */
+const collapseAttrib=()=>document.querySelectorAll(".maplibregl-ctrl-attrib").forEach(el=>el.classList.remove("maplibregl-compact-show"));
+map.on("load",()=>{collapseAttrib();setTimeout(collapseAttrib,1200);setTimeout(collapseAttrib,4000);});
 map.on("moveend",()=>store.set("sa_view2",{center:map.getCenter().toArray(),zoom:map.getZoom(),bearing:map.getBearing(),pitch:map.getPitch()}));
 
 /* Kompass dreht sich mit, Tippen richtet nach Norden aus */
