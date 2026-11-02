@@ -183,6 +183,8 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .linego{flex:1;min-width:0;display:flex;align-items:center;gap:10px;background:none;border:0;padding:0;text-align:left;cursor:pointer}
 .iconbtn{width:32px;height:32px;border-radius:50%;border:0;background:none;display:grid;place-items:center;cursor:pointer;color:var(--muted);flex:none}
 .iconbtn svg{width:16px;height:16px;stroke:currentColor;stroke-width:2.4;fill:none;stroke-linecap:round}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 2px}
+.chip-ref{color:#fff;font-weight:800;font-size:12px;padding:2px 8px;border-radius:6px;font-variant-numeric:tabular-nums;letter-spacing:.03em}
 .toast{position:fixed;z-index:60;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);
   transform:translate(-50%,20px);opacity:0;transition:all .3s var(--ease);pointer-events:none;
   background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-weight:600;max-width:calc(100% - 110px);text-align:center;box-shadow:var(--shadow)}
@@ -471,6 +473,10 @@ const map = new maplibregl.Map({
     {id:"lines-casing",type:"line",source:"lines",layout:{"line-cap":"round","line-join":"round"},paint:{"line-color":"#ffffff","line-width":["interpolate",["linear"],["zoom"],8,4,16,10],"line-opacity":.9}},
     {id:"lines",type:"line",source:"lines",layout:{"line-cap":"round","line-join":"round"},paint:{"line-color":["get","color"],"line-width":["interpolate",["linear"],["zoom"],8,2,16,6]}},
     {id:"lines-hit",type:"line",source:"lines",paint:{"line-color":"#000","line-width":22,"line-opacity":0}},
+    {id:"lines-label",type:"symbol",source:"lines",minzoom:9,filter:["!=",["get","ref"],"–"],
+      layout:{"symbol-placement":"line","symbol-spacing":320,"text-field":["get","ref"],"text-font":["Open Sans Semibold"],
+        "text-size":["interpolate",["linear"],["zoom"],9,11,15,14],"text-letter-spacing":0.05,"text-keep-upright":true,"text-padding":4},
+      paint:{"text-color":"#ffffff","text-halo-color":["get","color"],"text-halo-width":3}},
     {id:"bue",type:"circle",source:"pts",minzoom:12,filter:["==",["get","t"],"bue"],
       paint:{"circle-radius":["interpolate",["linear"],["zoom"],12,3,16,6],"circle-color":"#f39200","circle-stroke-color":"#ffffff","circle-stroke-width":1.5}},
     {id:"bst",type:"circle",source:"pts",filter:["==",["get","t"],"bst"],
@@ -572,6 +578,13 @@ map.on("load",loadPoints);
 $("#ptsBst").checked=ptsOn.bst!==false; $("#ptsBue").checked=ptsOn.bue!==false;
 document.querySelectorAll("[data-pts]").forEach(cb=>cb.onchange=()=>{ptsOn[cb.dataset.pts]=cb.checked;store.set("sa_pts",ptsOn);updatePoints();});
 
+function nearLineRefs(lat,lng,r){
+  const out=[];
+  lines.forEach(l=>{ if(l.ref==="–") return; const b=lineBox(l);
+    if(lng>=b[0]&&lng<=b[2]&&lat>=b[1]&&lat<=b[3]&&distToLineM(lat,lng,l.feature.geometry.coordinates)<=r) out.push(l); });
+  return out.sort(byRef);
+}
+const refChips = ls => ls.length ? `<div class="chips">${ls.map(l=>`<span class="chip-ref" style="background:${l.color}">${esc(l.ref)}</span>`).join("")}</div>` : "";
 function lineBox(l){
   if(l.box) return l.box;
   let w=180,s=90,e=-180,n=-90;
@@ -635,7 +648,7 @@ map.on("click",e=>{
     const [lng,lat]=f.geometry.coordinates, m={lat,lng};
     const title = p.t==="bue" ? (p.n||"Bahnübergang") : (p.n||p.r);
     const kind = p.t==="bue" ? "Bahnübergang" : (BST_KIND[p.k]||"Betriebsstelle");
-    html=`<div class="pop"><span class="t">${esc(kind)}${p.r?` · DS100 <b>${esc(p.r)}</b>`:""}</span><h4>${esc(title)}</h4>${navLinks(m)}<p class="meta">${lat.toFixed(5)}, ${lng.toFixed(5)}</p></div>`;
+    html=`<div class="pop"><span class="t">${esc(kind)}${p.r?` · DS100 <b>${esc(p.r)}</b>`:""}</span><h4>${esc(title)}</h4>${refChips(nearLineRefs(lat,lng,150))}${navLinks(m)}<p class="meta">${lat.toFixed(5)}, ${lng.toFixed(5)}</p></div>`;
   }
   openPopup&&openPopup.remove();
   openPopup=new maplibregl.Popup({offset:10,maxWidth:"290px"}).setLngLat(f.geometry.type==="Point"?f.geometry.coordinates:e.lngLat).setHTML(html).addTo(map);
@@ -671,6 +684,7 @@ function navLinks(m){
 }
 function popupHtml(m){const t=TYPES[m.typ]||TYPES.sonst;const who=profiles[m.created_by]?.name||"Unbekannt";
   return `<div class="pop"><span class="t"><span class="tag" style="background:${t.color}">${esc(t.short)}</span>${esc(t.label)}</span><h4>${esc(m.titel)}</h4>
+  ${refChips(nearLineRefs(m.lat,m.lng,300))}
   ${m.notiz?`<p>${esc(m.notiz).replace(/\n/g,"<br>")}</p>`:""}
   ${navLinks(m)}
   <p class="meta">Erfasst von ${esc(who)} am ${fmtDate(m.created_at)}<br>${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}${canDelete(m)?"<br>Zum Entfernen den Pin lange drücken.":""}</p></div>`;}
