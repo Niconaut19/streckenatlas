@@ -41,6 +41,10 @@ button,input,select,textarea{font:inherit;color:inherit}
 .brand .mark{width:28px;height:28px;border-radius:7px;background:var(--red);display:grid;place-items:center}
 .brand .mark svg{width:18px;height:18px}
 .spacer{flex:1}
+.brandbtn{border:0;color:var(--ink);font-family:var(--sans);cursor:pointer;transition:transform .15s var(--ease)}
+.brandbtn:active{transform:scale(.97)}
+.brandbtn.loading .mark{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 .chip{border:0;padding:0 8px 0 6px;gap:8px;cursor:pointer;max-width:58vw;transition:transform .15s var(--ease)}
 .chip:active{transform:scale(.97)}
 .avatar{width:32px;height:32px;border-radius:50%;background:var(--grey-1);display:grid;place-items:center;font-weight:700;font-size:13px;flex:none}
@@ -239,7 +243,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 <div id="map"></div>
 
 <div class="top">
-  <div class="brand"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M8 3 6 21M16 3l2 18M6.8 8h10.4M6.2 14h11.6"/></svg></span>Streckenatlas</div>
+  <button class="brand brandbtn" id="btnReload" title="App aktualisieren" aria-label="App aktualisieren"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M8 3 6 21M16 3l2 18M6.8 8h10.4M6.2 14h11.6"/></svg></span>Streckenatlas</button>
   <div class="spacer"></div>
   <button class="chip" id="userChip" hidden><span class="avatar" id="userAvatar"></span><span class="who"><b id="userName"></b><small id="userRole"></small></span></button>
 </div>
@@ -560,6 +564,13 @@ const applyOrm=()=>{ORM.forEach(o=>setVis("orm-"+o.key,ormState[o.key]));store.s
 $("#ormList").addEventListener("change",e=>{const k=e.target.dataset.orm;if(k){ormState[k]=e.target.checked;applyOrm();}});
 
 map.on("load",()=>{setBase(savedBase);applyOrm();updateLinesSource();});
+
+/* Auf das Logo tippen = App neu laden (frische Version holen) */
+$("#btnReload").onclick=()=>{
+  $("#btnReload").classList.add("loading"); vibrate(10);
+  setTimeout(()=>location.replace(location.pathname+"?v="+Date.now()),250);
+};
+if(location.search.includes("v=")) history.replaceState(null,"",location.pathname+location.hash);
 
 /* Aufklappbare Bereiche merken */
 const folds=store.get("sa_folds",{});
