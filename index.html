@@ -717,7 +717,6 @@ function renderLines(){
   const rows=arr.slice(0,MAX_ROWS);
   $("#lineList").innerHTML = (rows.length ? rows.map(l=>`<label class="opt linerow" data-row="${l.id}">
       <span class="swatch" style="background:${l.color}"></span><span class="ref">${esc(l.ref)}</span><span class="lbl"><span class="lname">${esc(shortName(l))}</span></span>
-      <button type="button" class="iconbtn" data-go="${l.id}" aria-label="Strecke ${esc(l.ref)} auf der Karte zeigen" title="Auf der Karte zeigen">${showIcon}</button>
       <span class="toggle"><input type="checkbox" data-line="${l.id}" aria-label="Strecke ${esc(l.ref)} anzeigen" ${l.on?"checked":""}><i></i></span></label>`).join("")
     : `<div class="opt"><span class="hint">Keine Strecke gefunden.</span></div>`)
     + (arr.length>MAX_ROWS ? `<div class="opt"><span class="hint">${arr.length-MAX_ROWS} weitere – tippe eine Nummer oder einen Ort ins Suchfeld.</span></div>` : "");
@@ -736,13 +735,7 @@ $("#lineList").addEventListener("touchmove",e=>{
   }
 },{passive:true});
 $("#lineList").addEventListener("touchend",e=>{if(swipe&&swipe.done) e.preventDefault(); swipe=null;});
-$("#lineList").addEventListener("click",e=>{
-  const go=e.target.closest("[data-go]"); if(!go) return;
-  e.preventDefault();
-  const l=lines.get(+go.dataset.go); if(!l) return;
-  if(!l.on){l.on=true;saveLineOff();refreshLinesUI();}
-  fitLine(l);
-});
+
 $("#btnAllOn").onclick=()=>{visibleLines().forEach(l=>l.on=true);saveLineOff();refreshLinesUI();};
 $("#btnAllOff").onclick=()=>{visibleLines().forEach(l=>l.on=false);saveLineOff();refreshLinesUI();};
 $("#lineFilterToggle").checked=lineFilterOn; $("#lineRadius").value=lineFilterRadius;
