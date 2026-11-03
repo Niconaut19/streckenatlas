@@ -5,6 +5,7 @@ zusammengefasst je Streckennummer (ref), mit Name. Die Geometrie wird vereinfach
 Datei auf dem Handy schnell lädt.
 """
 import json
+import re
 import math
 import sys
 import time
@@ -115,8 +116,16 @@ def build(data):
             continue
         tags = rel.get("tags", {})
         ref = (tags.get("ref") or "").strip()
-        key = ref if ref else f"id:{rel['id']}"
-        groups.setdefault(key, []).append(rel)
+        if not ref:
+            # Manche Strecken haben die Nummer nur im Namen, z. B. "5012 Bahnstrecke Kronach–Nordhalben"
+            m = re.match(r"^(\d{4})\b", (tags.get("name") or "").strip())
+            ref = m.group(1) if m else ""
+        # Nur echte 4-stellige Streckennummern (VzG). Ohne Nummer sind es z. B. europäische
+        # Fernverkehrsrouten wie die "Magistrale Européenne", 3-stellig sind Kursbuchstrecken.
+        # Beide liegen auf den echten Strecken und würden sie überdecken.
+        if not re.fullmatch(r"\d{4}", ref):
+            continue
+        groups.setdefault(ref, []).append(rel)
 
     features = []
     for key, rels in groups.items():

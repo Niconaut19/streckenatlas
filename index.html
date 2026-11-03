@@ -224,6 +224,9 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .fold[open] .chev{transform:rotate(180deg)}
 .fold .foldbody{padding-top:12px}
 .sheet .body:has(.fold){gap:0}
+.lrow{display:flex;align-items:center;gap:8px;margin:8px 0}
+.lrow-name{flex:1;min-width:0;font-weight:600;line-height:1.3}
+.lrow .kmbig{white-space:nowrap}
 .kmbig{font-weight:600;color:var(--muted);font-size:15px;font-variant-numeric:tabular-nums}
 .linerow{cursor:pointer;-webkit-user-select:none;user-select:none}
 .linerow:active{background:var(--grey-1)}
@@ -882,8 +885,13 @@ map.on("click",e=>{
   const f=hit.find(h=>h.layer.id==="bst")||hit.find(h=>h.layer.id==="bue")||hit[0];
   const p=f.properties; let html;
   if(f.layer.id==="lines-hit"){
-    const l=lines.get(+p.id), k=l?kmAt(e.lngLat.lat,e.lngLat.lng,l):null;
-    html=`<div class="pop"><span class="t"><span class="swatch" style="background:${p.color}"></span>Strecke</span><h4>${esc(p.ref)}${k!=null?` <span class="kmbig">${fmtKm(k)}</span>`:""}</h4><p>${esc(p.name)}</p>${k!=null?`<p class="meta">Kilometer ungefähr, aus den nächsten Kilometersteinen berechnet</p>`:""}</div>`;
+    /* Alle Strecken an der Tippstelle, nach Nummer sortiert */
+    const seen=new Set(), ls=[];
+    hit.filter(h=>h.layer.id==="lines-hit").forEach(h=>{const l=lines.get(+h.properties.id); if(l&&!seen.has(l.id)){seen.add(l.id);ls.push(l);}});
+    ls.sort(byRef);
+    const rows=ls.map(l=>{const k=kmAt(e.lngLat.lat,e.lngLat.lng,l);
+      return `<div class="lrow"><span class="chip-ref" style="background:${l.color}">${esc(l.ref)}</span><span class="lrow-name">${esc(shortName(l))}</span>${k!=null?`<span class="kmbig">${fmtKm(k)}</span>`:""}</div>`;}).join("");
+    html=`<div class="pop"><span class="t">${ls.length>1?`${ls.length} Strecken an dieser Stelle`:"Strecke"}</span>${rows}<p class="meta">Kilometer ungefähr, aus den nächsten Kilometersteinen berechnet</p></div>`;
   } else {
     const [lng,lat]=f.geometry.coordinates, m={lat,lng};
     const title = p.t==="bue" ? (p.n||"Bahnübergang") : (p.n||p.r);
