@@ -145,6 +145,30 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .ref{font-weight:700;font-variant-numeric:tabular-nums;min-width:3.4em}
 .lname{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
+/* Team */
+.teamrow{width:100%;border:0;text-align:left;font:inherit;color:inherit}
+.astack{display:flex;flex:none}
+.astack .avatar{width:30px;height:30px;font-size:12px;border:2px solid var(--white);margin-left:-9px}
+.astack .avatar:first-child{margin-left:0}
+.rchev{width:18px;height:18px;stroke:var(--muted);stroke-width:2.4;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.pill{background:var(--red);color:#fff;font-weight:800;font-size:12px;min-width:22px;height:22px;padding:0 7px;border-radius:999px;display:grid;place-items:center;flex:none;font-variant-numeric:tabular-nums}
+.backbtn{width:36px;height:36px;border-radius:50%;border:0;background:var(--grey-1);display:grid;place-items:center;cursor:pointer;flex:none;margin-left:-8px}
+.backbtn svg{width:18px;height:18px;stroke:var(--ink);stroke-width:2.4;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.tsearch{background:var(--grey-1);border:1.5px solid transparent;border-radius:10px;padding:11px 12px;width:100%;font-size:16px;color:var(--ink)}
+.tsearch:focus{outline:none;border-color:var(--ink);background:var(--white)}
+.tgroup summary{list-style:none;display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px;-webkit-user-select:none;user-select:none}
+.tgroup summary::-webkit-details-marker{display:none}
+.tgroup summary h3{margin:0;flex:1;font-size:13px;font-weight:700;color:var(--muted)}
+#sheetTeam{height:82%}
+@media (min-width:760px){#sheetTeam{height:auto}}
+.tgroup .chev{flex:none;width:18px;height:18px;stroke:var(--muted);stroke-width:2.4;fill:none;stroke-linecap:round;stroke-linejoin:round;transition:transform .25s var(--ease)}
+.tgroup[open] .chev{transform:rotate(180deg)}
+.tgroup:not([open]) summary{margin-bottom:0}
+.person{width:100%;border:0;text-align:left;font:inherit;color:inherit}
+.person:active{background:var(--grey-1)}
+.me-tag{font-size:12px;font-weight:700;color:var(--muted);flex:none}
+.typetools{display:flex;gap:6px;margin-bottom:8px}
+
 .btn{border:1.5px solid var(--grey-2);background:var(--white);border-radius:10px;padding:10px 16px;cursor:pointer;font-weight:700;transition:transform .12s var(--ease),background .2s}
 .btn:active{transform:scale(.97)}
 .btn.primary{background:var(--red);border-color:var(--red);color:#fff}
@@ -377,8 +401,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
       <p class="hint" style="margin-bottom:10px">Ohne Datenbank läuft die App nur auf diesem Gerät. Wechsle die Person, um die Rechte auszuprobieren.</p>
       <div class="list" id="demoUsers"></div></div>
     <div class="group" id="teamBox" hidden><h3>Team &amp; Rollen</h3>
-      <p class="hint" style="margin-bottom:10px">Neue Konten warten auf Freischaltung. Hinzufügen darf jeder, entfernen nur Admins.</p>
-      <div class="list" id="teamList"></div></div>
+      <div class="list"><button type="button" class="opt teamrow" id="openTeam"><span class="astack" id="teamStack"></span><span class="lbl"><span class="lname">Team verwalten</span><small class="lname" id="teamSum"></small></span><span class="pill" id="teamPending" hidden></span><svg class="rchev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></div></div>
     <div class="group"><h3>Hinweise in der Nähe</h3>
       <p class="hint" style="margin-bottom:10px">Meldet sich, wenn du an eine Anlage herankommst. Funktioniert, solange die App geöffnet ist.</p>
       <div class="list">
@@ -386,8 +409,9 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
         <label class="opt"><span class="lbl">Umkreis</span><select id="nbRadius" class="minisel"><option value="150">150 m</option><option value="300">300 m</option><option value="500">500 m</option><option value="1000">1 km</option></select></label>
         <label class="opt" id="nbSysRow"><span class="lbl">Auch als Mitteilung<br><small>Banner des Handys, wenn die App im Hintergrund noch offen ist</small></span><span class="toggle"><input type="checkbox" id="nbSys"><i></i></span></label>
       </div>
-      <h3 style="margin-top:14px">Bei diesen Arten</h3>
-      <div class="list" id="nbTypes"></div>
+      <details class="tgroup" id="nbTypesFold" style="margin-top:14px"><summary><h3>Bei diesen Arten</h3><small class="hint" id="nbTypesSum" style="font-size:13px"></small><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
+        <div class="typetools"><button type="button" class="addbtn" id="nbAll">Alle</button><button type="button" class="addbtn" id="nbNone">Keine</button></div>
+        <div class="list" id="nbTypes"></div></details>
     </div>
     <div class="group"><h3>Darstellung</h3>
       <div class="seg" id="themeSeg">
@@ -401,6 +425,32 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
     <button class="btn block" id="btnLogout">Abmelden</button>
   </div>
 </section>
+
+<!-- Team -->
+<section class="sheet" id="sheetTeam" aria-label="Team">
+  <div class="grab"></div>
+  <header><button class="backbtn" id="teamBack" aria-label="Zurück zum Konto"><svg viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></svg></button><h2>Team</h2><button class="x" data-close aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+  <div class="body">
+    <input type="search" class="tsearch" id="teamSearch" placeholder="Name oder E-Mail suchen" autocomplete="off" aria-label="Kollegen suchen">
+    <div id="teamGroups" style="display:flex;flex-direction:column;gap:22px"></div>
+    <p class="hint">Neue Konten warten auf Freischaltung. Tippe auf eine Person, um ihre Rolle zu ändern.</p>
+  </div>
+</section>
+
+<div class="modal" id="personModal" hidden role="dialog" aria-modal="true" aria-labelledby="pHead">
+  <div class="card">
+    <h2 id="pHead">Rolle ändern</h2>
+    <div class="csum"><span class="avatar" id="pAvatar" style="width:40px;height:40px;font-size:16px;background:var(--white)"></span><div><b id="pName"></b><small id="pMail" style="overflow-wrap:anywhere"></small></div></div>
+    <div class="seg" id="pRole">
+      <label><input type="radio" name="pRole" value="wartend">Gesperrt</label>
+      <label><input type="radio" name="pRole" value="mitarbeiter">Mitarbeiter</label>
+      <label><input type="radio" name="pRole" value="admin">Admin</label>
+    </div>
+    <p class="hint" id="pHint"></p>
+    <button class="btn primary block" id="pSave">Speichern</button>
+    <button class="btn block" id="pBack">Abbrechen</button>
+  </div>
+</div>
 
 <!-- Anmeldung -->
 <div class="gate" id="gate" hidden>
@@ -1171,7 +1221,7 @@ document.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",
 $("#scrim").onclick=closeSheets;
 $("#btnLayers").onclick=()=>{$("#sheetLayers").classList.contains("open")?closeSheets():openSheet("#sheetLayers");};
 $("#userChip").onclick=()=>{renderUserSheet();openSheet("#sheetUser");};
-document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeSheets();setAddMode(false);}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("#personModal").hidden){$("#personModal").hidden=true;return;}closeSheets();setAddMode(false);}});
 
 /* Sheet nach unten wischen zum Schließen */
 document.querySelectorAll(".sheet").forEach(sheet=>{
@@ -1189,16 +1239,72 @@ async function renderUserSheet(){
     $("#demoUsers").onchange=async e=>{api.switchTo(e.target.value);await start();renderUserSheet();toast("Angemeldet als "+me.name);};
   }
   const isAdmin = me.role==="admin"; $("#teamBox").hidden=!isAdmin;
-  if(isAdmin){
-    const ps=await api.listProfiles();
-    $("#teamList").innerHTML=ps.map(p=>`<div class="opt"><span class="avatar">${esc((p.name||p.email||"?")[0].toUpperCase())}</span><span class="lbl"><span class="lname">${esc(p.name||p.email)}</span><small class="lname">${esc(p.email||"")}</small></span>
-      <select data-role="${p.id}" aria-label="Rolle von ${esc(p.name||p.email)}" ${p.id===me.id?"disabled":""} style="background:var(--grey-1);border:0;border-radius:8px;padding:8px;font-weight:600;font-size:14px">
-      ${["wartend","mitarbeiter","admin"].map(r=>`<option value="${r}" ${p.role===r?"selected":""}>${r==="wartend"?"Wartet":r==="admin"?"Admin":"Mitarbeiter"}</option>`).join("")}</select></div>`).join("");
-    $("#teamList").onchange=async e=>{const id=e.target.dataset.role;if(!id)return;
-      try{await api.setRole(id,e.target.value);toast("Rolle geändert");await refreshMarkers();}catch(err){toast("Ändern fehlgeschlagen: "+err.message);}};
-  }
+  if(isAdmin){ try{ team=await api.listProfiles(); }catch(err){ team=[]; } renderTeamRow(); }
   $("#btnLogout").hidden=api.demo;
 }
+
+/* ============ TEAM ============ */
+let team=[], teamQuery="";
+const ROLE_LABEL={wartend:"Wartet",mitarbeiter:"Mitarbeiter",admin:"Admin"};
+const initial = p => esc((p.name||p.email||"?").trim()[0]?.toUpperCase()||"?");
+const pName = p => p.name||p.email||"Unbekannt";
+function renderTeamRow(){
+  const active=team.filter(p=>p.role!=="wartend"), waiting=team.length-active.length;
+  $("#teamStack").innerHTML=active.slice(0,4).map(p=>`<span class="avatar">${initial(p)}</span>`).join("");
+  $("#teamSum").textContent=`${active.length} ${active.length===1?"Mitglied":"Mitglieder"}`+(waiting?` · ${waiting} neu`:"");
+  $("#teamPending").hidden=!waiting; $("#teamPending").textContent=waiting;
+}
+function personRow(p){
+  const self=p.id===me.id;
+  if(p.role==="wartend") return `<div class="opt"><span class="avatar">${initial(p)}</span><span class="lbl"><span class="lname">${esc(pName(p))}</span><small class="lname">${esc(p.email||"")}</small></span>
+    <button type="button" class="addbtn" data-approve="${p.id}">Freischalten</button><button type="button" class="iconbtn" data-person="${p.id}" aria-label="Mehr zu ${esc(pName(p))}"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></div>`;
+  return `<button type="button" class="opt person" data-person="${p.id}"><span class="avatar">${initial(p)}</span><span class="lbl"><span class="lname">${esc(pName(p))}</span></span>${self?`<span class="me-tag">Du</span>`:""}<svg class="rchev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>`;
+}
+const teamOpen=store.get("sa_team_open",{admin:true,mitarbeiter:true});
+function renderTeam(){
+  const q=teamQuery.trim().toLowerCase();
+  const hit=p=>!q||(p.name||"").toLowerCase().includes(q)||(p.email||"").toLowerCase().includes(q);
+  const byName=(a,b)=>pName(a).localeCompare(pName(b),"de");
+  const groups=[["wartend","Wartet auf Freischaltung"],["admin","Admins"],["mitarbeiter","Mitarbeiter"]].map(([r,label])=>{
+    const ps=team.filter(p=>p.role===r&&hit(p)).sort(byName);
+    if(!ps.length) return "";
+    if(r==="wartend") return `<div class="group"><h3>${label} (${ps.length})</h3><div class="list">${ps.map(personRow).join("")}</div></div>`;
+    return `<details class="tgroup" data-tg="${r}" ${q||teamOpen[r]!==false?"open":""}><summary><h3>${label} (${ps.length})</h3><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="list">${ps.map(personRow).join("")}</div></details>`;
+  }).join("");
+  $("#teamGroups").innerHTML=groups||`<p class="hint">Niemand gefunden für „${esc(teamQuery)}“.</p>`;
+}
+async function reloadTeam(){ team=await api.listProfiles(); profiles=Object.fromEntries(team.map(p=>[p.id,p])); renderTeam(); renderTeamRow(); }
+$("#openTeam").onclick=()=>{teamQuery="";$("#teamSearch").value="";renderTeam();openSheet("#sheetTeam");};
+$("#teamBack").onclick=()=>{renderUserSheet();openSheet("#sheetUser");};
+$("#teamSearch").oninput=e=>{teamQuery=e.target.value;renderTeam();};
+$("#teamGroups").addEventListener("toggle",e=>{const r=e.target.dataset?.tg; if(r&&!teamQuery){teamOpen[r]=e.target.open;store.set("sa_team_open",teamOpen);}},true);
+$("#teamGroups").addEventListener("click",async e=>{
+  const ap=e.target.closest("[data-approve]");
+  if(ap){ ap.disabled=true;
+    try{ await api.setRole(ap.dataset.approve,"mitarbeiter"); vibrate(15); toast(`${pName(team.find(p=>p.id===ap.dataset.approve)||{})} freigeschaltet`); await reloadTeam(); await refreshMarkers(); }
+    catch(err){ ap.disabled=false; toast("Freischalten fehlgeschlagen: "+err.message); }
+    return; }
+  const pb=e.target.closest("[data-person]"); if(pb) openPerson(pb.dataset.person);
+});
+let personId=null;
+function openPerson(id){
+  const p=team.find(x=>x.id===id); if(!p) return; personId=id; const self=id===me.id;
+  $("#pAvatar").innerHTML=initial(p); $("#pName").textContent=pName(p); $("#pMail").textContent=p.email||"";
+  document.querySelectorAll('#pRole input').forEach(i=>{i.checked=i.value===p.role;i.disabled=self;});
+  $("#pHint").textContent=self?"Deine eigene Rolle kannst du nicht ändern. So sperrst du dich nicht versehentlich aus.":"„Gesperrt“ nimmt den Zugang zur Karte weg, das Konto bleibt bestehen.";
+  $("#pSave").hidden=self; $("#pBack").textContent=self?"Schließen":"Abbrechen";
+  $("#personModal").hidden=false;
+}
+$("#pBack").onclick=()=>{$("#personModal").hidden=true;};
+$("#personModal").onclick=e=>{if(e.target.id==="personModal")$("#personModal").hidden=true;};
+$("#pSave").onclick=async()=>{
+  const role=document.querySelector('#pRole input:checked')?.value, p=team.find(x=>x.id===personId);
+  if(!p||!role) return; if(role===p.role){$("#personModal").hidden=true;return;}
+  $("#pSave").disabled=true;
+  try{ await api.setRole(personId,role); $("#personModal").hidden=true; toast(`${pName(p)} ist jetzt ${role==="wartend"?"gesperrt":ROLE_LABEL[role]}`); await reloadTeam(); await refreshMarkers(); }
+  catch(err){ toast("Ändern fehlgeschlagen: "+err.message); }
+  finally{ $("#pSave").disabled=false; }
+};
 
 /* ============ Anmeldung & Start ============ */
 let authMode="in";
@@ -1324,12 +1430,16 @@ function renderNbSettings(){
   $("#nbOn").checked=nb.on; $("#nbRadius").value=nb.radius; $("#nbSys").checked=nb.sys;
   $("#nbSysRow").hidden=!("Notification" in window);
   $("#nbTypes").innerHTML=Object.entries(TYPES).map(([k,t])=>`<label class="opt"><span class="tag" style="background:${t.color}">${tagInner(t)}</span><span class="lbl">${t.label}</span>${toggle("data-nbtype",k,!!nb.types[k])}</label>`).join("");
+  renderNbTypesSum();
 }
+function renderNbTypesSum(){const ks=Object.keys(TYPES),n=ks.filter(k=>nb.types[k]).length;$("#nbTypesSum").textContent=n===ks.length?"alle aktiv":`${n} von ${ks.length} aktiv`;}
+const setAllNb=on=>{Object.keys(TYPES).forEach(k=>nb.types[k]=on);saveNb();renderNbSettings();};
+$("#nbAll").onclick=()=>setAllNb(true); $("#nbNone").onclick=()=>setAllNb(false);
 renderNbSettings();
 $("#nbOn").onchange=e=>{nb.on=e.target.checked;saveNb();
   if(nb.on){ if(startWatch(false)) toast("Hinweise an: Du bekommst eine Meldung, wenn du in die Nähe kommst"); if(lastLL) checkNearby(lastLL);} };
 $("#nbRadius").onchange=e=>{nb.radius=e.target.value;saveNb();};
-$("#nbTypes").addEventListener("change",e=>{const k=e.target.dataset.nbtype;if(k){nb.types[k]=e.target.checked;saveNb();}});
+$("#nbTypes").addEventListener("change",e=>{const k=e.target.dataset.nbtype;if(k){nb.types[k]=e.target.checked;saveNb();renderNbTypesSum();}});
 $("#nbSys").onchange=async e=>{
   nb.sys=e.target.checked;
   if(nb.sys && Notification.permission!=="granted"){
