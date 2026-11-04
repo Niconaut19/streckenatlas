@@ -276,6 +276,12 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .nbtext b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nbtext small{color:var(--muted);font-size:12.5px}
 .nearby .x{width:32px;height:32px;flex:none}
+.iconchip{width:56px;padding:0;justify-content:center;gap:1px;flex-direction:column;color:var(--ink)}
+.iconchip svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round}
+.iconchip span{font-size:10px;font-weight:800;line-height:1;letter-spacing:.04em}
+.kmrow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.kmrow input{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.kmpin{width:22px;height:22px;border-radius:50%;background:var(--red);border:4px solid #fff;box-shadow:0 0 0 6px rgba(236,0,22,.25),0 2px 6px rgba(0,0,0,.4);animation:pop .3s var(--ease)}
 .toast{position:fixed;z-index:60;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);
   transform:translate(-50%,20px);opacity:0;transition:all .3s var(--ease);pointer-events:none;
   background:var(--inv-bg);color:var(--inv-fg);padding:12px 18px;border-radius:12px;font-weight:600;max-width:calc(100% - 110px);text-align:center;box-shadow:var(--shadow)}
@@ -327,6 +333,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 <div class="top">
   <button class="brand brandbtn" id="btnReload" title="App aktualisieren" aria-label="App aktualisieren"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M8 3 6 21M16 3l2 18M6.8 8h10.4M6.2 14h11.6"/></svg></span>Streckenatlas</button>
   <div class="spacer"></div>
+  <button class="chip iconchip" id="btnKm" hidden title="Kilometer suchen" aria-label="Kilometer suchen"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg><span>km</span></button>
   <button class="chip" id="userChip" hidden><span class="avatar" id="userAvatar"></span><span class="who"><b id="userName"></b><small id="userRole"></small></span></button>
 </div>
 
@@ -390,6 +397,23 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
     <div class="field"><label for="fNotiz">Notiz (optional)</label><textarea id="fNotiz" maxlength="1000" placeholder="Zugang, Besonderheiten, Strecken-km …"></textarea></div>
     <button class="btn primary block" type="submit" id="addSave">Speichern</button>
   </form>
+</section>
+
+<!-- Kilometer-Suche -->
+<section class="sheet" id="sheetKm" aria-label="Kilometer suchen">
+  <div class="grab"></div>
+  <header><h2>Kilometer suchen</h2><button class="x" data-close aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+  <form class="body" id="kmForm" autocomplete="off">
+    <div class="kmrow">
+      <div class="field"><label for="kmLine">Strecke</label><input id="kmLine" inputmode="numeric" list="kmLines" placeholder="5503" maxlength="12" enterkeyhint="next"></div>
+      <div class="field"><label for="kmVal">Kilometer</label><input id="kmVal" inputmode="decimal" placeholder="21,3" maxlength="12" enterkeyhint="search"></div>
+    </div>
+    <p class="hint" id="kmLineName"></p>
+    <p class="err" id="kmErr"></p>
+    <button class="btn primary block" type="submit" id="kmGo">Hinspringen</button>
+    <p class="hint">Kilometer als <b>21,3</b> oder <b>21+350</b> (für km 21,350). Die Stelle wird aus den nächsten Kilometersteinen berechnet und ist ungefähr.</p>
+  </form>
+  <datalist id="kmLines"></datalist>
 </section>
 
 <!-- Konto / Team -->
@@ -803,7 +827,7 @@ async function loadBayern(){
       f.properties.color=color;
       lines.set(id,{id,ref,name,color,on:!lineOff[id],feature:f});
     }
-    refreshLinesUI();
+    refreshLinesUI(); fillKmLines();
   }catch(e){
     $("#linesHint").textContent="Die Streckendaten sind noch nicht da. Sie werden gerade vorbereitet, bitte in ein paar Minuten neu laden.";
   }
@@ -1372,11 +1396,82 @@ async function logout(){await api.signOut();me=null;markers=[];mapMarkers.forEac
 $("#btnLogout").onclick=logout; $("#btnLogout2").onclick=logout; $("#btnRecheck").onclick=()=>start();
 
 let subscribed=false;
+/* ============ KILOMETER-SUCHE: Strecke + km -> Stelle auf der Karte ============ */
+const lineByRef=ref=>{for(const l of lines.values()) if(l.ref===ref) return l; return null;};
+function fillKmLines(){
+  $("#kmLines").innerHTML=[...lines.values()].sort(byRef).map(l=>`<option value="${esc(l.ref)}">${esc(shortName(l))}</option>`).join("");
+}
+function parseKm(v){
+  v=String(v||"").trim().replace(/^km\s*/i,"").replace(/\s/g,"");
+  if(!v) return null;
+  let m=v.match(/^(\d+)\+(\d{1,3})$/);           // 21+350  -> 21,350
+  if(m) return +m[1]+(+m[2].padStart(3,"0"))/1000;
+  v=v.replace(",",".");
+  return /^\d+(\.\d+)?$/.test(v)?+v:null;
+}
+function nearestOnLine(lat,lng,coords){
+  const k=111320,kx=k*Math.cos(lat*Math.PI/180); let best=Infinity,bp=null;
+  for(const seg of coords) for(let i=1;i<seg.length;i++){
+    const ax=(seg[i-1][0]-lng)*kx, ay=(seg[i-1][1]-lat)*k, bx=(seg[i][0]-lng)*kx, by=(seg[i][1]-lat)*k;
+    const dx=bx-ax, dy=by-ay, L=dx*dx+dy*dy; let t=L?-(ax*dx+ay*dy)/L:0; t=Math.max(0,Math.min(1,t));
+    const px=ax+t*dx, py=ay+t*dy, d=Math.hypot(px,py);
+    if(d<best){best=d;bp=[lng+px/kx,lat+py/k];}
+  }
+  return bp;
+}
+const fmtK=v=>v.toLocaleString("de-DE",{minimumFractionDigits:1,maximumFractionDigits:3});
+function posAtKm(l,km){
+  const posts=lineKm(l).map(f=>({km:f.properties.k,c:f.geometry.coordinates}));
+  if(posts.length<2) return {err:`Für Strecke ${l.ref} sind keine Kilometersteine hinterlegt.`};
+  const kms=posts.map(p=>p.km), lo=posts.filter(p=>p.km<=km), hi=posts.filter(p=>p.km>=km);
+  if(!lo.length||!hi.length) return {err:`Auf Strecke ${l.ref} sind nur km ${fmtK(Math.min(...kms))} bis ${fmtK(Math.max(...kms))} hinterlegt.`};
+  const loMax=Math.max(...lo.map(p=>p.km)), hiMin=Math.min(...hi.map(p=>p.km));
+  let best=null;
+  for(const a of lo.filter(p=>p.km===loMax)) for(const b of hi.filter(p=>p.km===hiMin)){const d=distM(a.c,b.c); if(!best||d<best.d) best={a,b,d};}
+  if(best.d>4000) return {err:`Zwischen km ${fmtK(loMax)} und km ${fmtK(hiMin)} fehlen auf Strecke ${l.ref} Kilometersteine. Versuch einen Wert in der Nähe.`};
+  const {a,b}=best, t=b.km===a.km?0:(km-a.km)/(b.km-a.km);
+  const p=[a.c[0]+(b.c[0]-a.c[0])*t, a.c[1]+(b.c[1]-a.c[1])*t];
+  return {pos:nearestOnLine(p[1],p[0],l.feature.geometry.coordinates)||p};
+}
+let kmMarker=null, kmPopup=null;
+function showKmLineName(){
+  const l=lineByRef($("#kmLine").value.trim());
+  $("#kmLineName").textContent=l?shortName(l):"";
+}
+$("#kmLine").oninput=()=>{$("#kmLine").value=$("#kmLine").value.replace(/[^\d]/g,"").slice(0,4); showKmLineName(); $("#kmErr").textContent=""; if($("#kmLine").value.length===4) $("#kmVal").focus();};
+$("#kmVal").oninput=()=>{$("#kmErr").textContent="";};
+$("#btnKm").onclick=()=>{
+  if($("#sheetKm").classList.contains("open")){closeSheets();return;}
+  const last=store.get("sa_kmsearch",{}); if(!$("#kmLine").value&&last.line) $("#kmLine").value=last.line;
+  showKmLineName(); $("#kmErr").textContent=""; openSheet("#sheetKm");
+  setTimeout(()=>($("#kmLine").value?$("#kmVal"):$("#kmLine")).focus(),300);
+};
+$("#kmForm").onsubmit=e=>{
+  e.preventDefault(); const err=$("#kmErr");
+  const ref=$("#kmLine").value.trim(), km=parseKm($("#kmVal").value);
+  const l=lineByRef(ref);
+  if(!l){err.textContent=ref?`Strecke ${ref} gibt es in den Bayern-Daten nicht.`:"Bitte eine Streckennummer eingeben.";return;}
+  if(km==null){err.textContent="Bitte einen Kilometer eingeben, z. B. 21,3 oder 21+350.";$("#kmVal").focus();return;}
+  if(!allKm.length){err.textContent="Die Kilometerdaten werden noch geladen. Bitte gleich nochmal versuchen.";return;}
+  const r=posAtKm(l,km); if(r.err){err.textContent=r.err;return;}
+  store.set("sa_kmsearch",{line:ref});
+  const [lng,lat]=r.pos;
+  $("#kmVal").blur(); closeSheets(); setFollow(false); vibrate(15);
+  kmPopup&&kmPopup.remove(); kmMarker&&kmMarker.remove(); openPopup&&openPopup.remove();
+  const el=document.createElement("div"); el.className="kmpin";
+  kmMarker=new maplibregl.Marker({element:el}).setLngLat([lng,lat]).addTo(map);
+  map.flyTo({center:[lng,lat],zoom:17.5,duration:1100,essential:true});
+  kmPopup=new maplibregl.Popup({offset:16,maxWidth:"290px"}).setLngLat([lng,lat])
+    .setHTML(`<div class="pop"><span class="t">Kilometer-Suche</span><h4><span class="chip-ref" style="background:${l.color}">${esc(l.ref)}</span> ${esc(fmtKm(km).replace(/,0$/,""))}</h4><p>${esc(shortName(l))}</p>${navLinks({lat,lng})}<p class="meta">Ungefähre Stelle, aus den nächsten Kilometersteinen berechnet<br>${lat.toFixed(5)}, ${lng.toFixed(5)}</p></div>`).addTo(map);
+  kmPopup.on("close",()=>{kmMarker&&kmMarker.remove();kmMarker=null;});
+};
+
 /* ============ EINFÜHRUNG für neue Nutzer ============ */
 function tourSteps(){
   const admin=me&&me.role==="admin";
   return [
     {title:`Willkommen${me&&me.name?", "+me.name.split(" ")[0]:""}!`, text:"Der Streckenatlas zeigt dir die Bahnstrecken in Bayern auf amtlichen Luftbildern. Gemeinsam mit den Kollegen tragt ihr Anlagen wie Stellwerke ein. In einer Minute zeige ich dir die wichtigsten Knöpfe."},
+    {sel:"#btnKm", title:"Kilometer suchen", text:"Streckennummer und Kilometer eingeben, z. B. 5503 und 21,3. Die Karte springt an die Stelle, und du kannst direkt die Navigation dorthin starten."},
     {sel:"#btnLayers", title:"Karte & Strecken", text:"Hier wählst du die Kartenansicht und schaltest einzelne Strecken an oder aus. Tipp: Erst „Alle aus“, dann deine Streckennummer suchen und einschalten. Bahnhöfe, Bahnübergänge und Kilometer siehst du dann nur an deinen Strecken."},
     {sel:"#btnAdd", title:"Objekt hinzufügen", text:"Tippe auf das Plus und dann auf die Stelle in der Karte, wo z. B. ein ESTW steht. Art wählen, Bezeichnung eingeben, speichern und mit „Ja, hinzufügen“ bestätigen. Danach sehen es alle Kollegen."},
     {title:"Objekte & Navigation", text:"Tippe kurz auf einen Pin, eine Strecke oder einen Bahnhof: Du siehst Streckennummer, ungefähren Bahnkilometer und den Knopf „Navigation starten“."+(admin?" Als Admin entfernst du Objekte, indem du den Pin lange gedrückt hältst.":" Entfernen können nur Admins. Ist etwas falsch eingetragen, sag deinem Admin Bescheid.")},
@@ -1490,7 +1585,7 @@ async function start(){
   if(recovering) return;
   $("#gate").hidden = !!me; $("#pending").hidden = !(me && me.role==="wartend");
   const active = me && me.role!=="wartend";
-  $("#fabs").hidden=!active; $("#userChip").hidden=!active;
+  $("#fabs").hidden=!active; $("#userChip").hidden=!active; $("#btnKm").hidden=!active;
   if(!active) return;
   $("#userName").textContent=me.name; $("#userAvatar").textContent=(me.name||"?")[0].toUpperCase();
   $("#userRole").textContent=me.role==="admin"?"Admin":"Mitarbeiter"; $("#userRole").className=me.role==="admin"?"admin":"";
