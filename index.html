@@ -250,7 +250,8 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .sheet .body:has(.fold){gap:0}
 .lrow{display:flex;align-items:center;gap:8px;margin:8px 0}
 .lrow-name{flex:1;min-width:0;font-weight:600;line-height:1.3}
-.lrow .kmbig{white-space:nowrap}
+.lrow .kmexact{margin:4px 0 2px;font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.kmbig{white-space:nowrap}
 .kmbig{font-weight:600;color:var(--muted);font-size:15px;font-variant-numeric:tabular-nums}
 .linerow{cursor:pointer;-webkit-user-select:none;user-select:none}
 .linerow:active{background:var(--grey-1)}
@@ -970,7 +971,12 @@ map.on("click",e=>{
     const [lng,lat]=f.geometry.coordinates, m={lat,lng};
     const title = p.t==="bue" ? (p.n||"Bahnübergang") : (p.n||p.r);
     const kind = p.t==="bue" ? "Bahnübergang" : (BST_KIND[p.k]||"Betriebsstelle");
-    html=`<div class="pop"><span class="t">${esc(kind)}${p.r?` · DS100 <b>${esc(p.r)}</b>`:""}</span><h4>${esc(title)}</h4>${refChips(nearLineRefs(lat,lng,150),lat,lng)}${navLinks(m)}<p class="meta">${lat.toFixed(5)}, ${lng.toFixed(5)}</p></div>`;
+    const isBue=p.t==="bue", exact=isBue&&p.km!=null&&p.km!=="";
+    const refLabel=p.r?(isBue?` · Nr. <b>${esc(p.r)}</b>`:` · DS100 <b>${esc(p.r)}</b>`):"";
+    const kmLine=exact?`<p class="kmexact">km ${(+p.km).toLocaleString("de-DE",{minimumFractionDigits:3,maximumFractionDigits:3})}</p>`:"";
+    const chips=exact?refChips(nearLineRefs(lat,lng,150)):refChips(nearLineRefs(lat,lng,150),lat,lng);
+    const note=isBue?(exact?"Kilometrierung laut hinterlegten Daten<br>":"Genaue Kilometrierung für diesen Bahnübergang nicht hinterlegt, km-Wert ist ungefähr<br>"):"";
+    html=`<div class="pop"><span class="t">${esc(kind)}${refLabel}</span><h4>${esc(title)}</h4>${kmLine}${chips}${navLinks(m)}<p class="meta">${note}${lat.toFixed(5)}, ${lng.toFixed(5)}</p></div>`;
   }
   openPopup&&openPopup.remove();
   openPopup=new maplibregl.Popup({offset:10,maxWidth:"290px"}).setLngLat(f.geometry.type==="Point"?f.geometry.coordinates:e.lngLat).setHTML(html).addTo(map);
