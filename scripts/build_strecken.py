@@ -172,6 +172,13 @@ def build_points(data):
             props = {"t": "bue"}
             if t.get("name"):
                 props["n"] = t["name"]
+            km = parse_km(t.get("railway:position:exact"))
+            if km is None:
+                km = parse_km(t.get("railway:position"))
+            if km is not None:
+                props["km"] = round(km, 3)
+            if t.get("ref"):
+                props["r"] = t["ref"]
         else:
             if t.get("station") in SKIP_STATION or t.get("subway") == "yes":
                 continue
