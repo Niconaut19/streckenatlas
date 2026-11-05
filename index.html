@@ -277,9 +277,18 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .nbtext b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nbtext small{color:var(--muted);font-size:12.5px}
 .nearby .x{width:32px;height:32px;flex:none}
-.iconchip{width:56px;padding:0;justify-content:center;gap:1px;flex-direction:column;color:var(--ink)}
-.iconchip svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round}
+.iconchip{width:46px;padding:0;justify-content:center;color:var(--ink)}
+.iconchip svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round}
 .iconchip span{font-size:10px;font-weight:800;line-height:1;letter-spacing:.04em}
+.sres{width:100%;border:0;border-top:1px solid var(--grey-1);text-align:left;color:var(--ink);font:inherit;cursor:pointer;min-height:56px}
+.sres:active{background:var(--grey-1)}
+.sres .lbl b{display:block;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sres .lbl small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sic{width:30px;height:30px;border-radius:8px;background:var(--grey-1);display:grid;place-items:center;flex:none}
+.sic svg{width:17px;height:17px;stroke:var(--muted);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.sic-bst::after{content:"";width:12px;height:12px;border-radius:50%;background:#fff;border:3px solid var(--red)}
+.sres .tag{min-width:30px;height:30px}
+.searchhead{font-size:12px;font-weight:700;color:var(--muted);margin:0 0 -4px}
 .kmrow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .kmrow input{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
 .kmpin{width:22px;height:22px;border-radius:50%;background:var(--red);border:4px solid #fff;box-shadow:0 0 0 6px rgba(236,0,22,.25),0 2px 6px rgba(0,0,0,.4);animation:pop .3s var(--ease)}
@@ -334,7 +343,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 <div class="top">
   <button class="brand brandbtn" id="btnReload" title="App aktualisieren" aria-label="App aktualisieren"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M8 3 6 21M16 3l2 18M6.8 8h10.4M6.2 14h11.6"/></svg></span>Streckenatlas</button>
   <div class="spacer"></div>
-  <button class="chip iconchip" id="btnKm" hidden title="Kilometer suchen" aria-label="Kilometer suchen"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg><span>km</span></button>
+  <button class="chip iconchip" id="btnKm" hidden title="Suchen" aria-label="Suchen"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg></button>
   <button class="chip" id="userChip" hidden><span class="avatar" id="userAvatar"></span><span class="who"><b id="userName"></b><small id="userRole"></small></span></button>
 </div>
 
@@ -400,20 +409,31 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
   </form>
 </section>
 
-<!-- Kilometer-Suche -->
-<section class="sheet" id="sheetKm" aria-label="Kilometer suchen">
+<!-- Suche: Orte & Bahnhöfe / Kilometer -->
+<section class="sheet" id="sheetKm" aria-label="Suchen">
   <div class="grab"></div>
-  <header><h2>Kilometer suchen</h2><button class="x" data-close aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
-  <form class="body" id="kmForm" autocomplete="off">
-    <div class="kmrow">
-      <div class="field"><label for="kmLine">Strecke</label><input id="kmLine" inputmode="numeric" list="kmLines" placeholder="5503" maxlength="12" enterkeyhint="next"></div>
-      <div class="field"><label for="kmVal">Kilometer</label><input id="kmVal" inputmode="decimal" placeholder="21,3" maxlength="12" enterkeyhint="search"></div>
+  <header><h2>Suchen</h2><button class="x" data-close aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+  <div class="body">
+    <div class="seg" id="searchTabs">
+      <label><input type="radio" name="stab" value="place" id="stabPlace" checked>Ort &amp; Bahnhof</label>
+      <label><input type="radio" name="stab" value="km" id="stabKm">Kilometer</label>
     </div>
-    <p class="hint" id="kmLineName"></p>
-    <p class="err" id="kmErr"></p>
-    <button class="btn primary block" type="submit" id="kmGo">Hinspringen</button>
-    <p class="hint">Kilometer als <b>21,3</b> oder <b>21+350</b> (für km 21,350). Die Stelle wird aus den nächsten Kilometersteinen berechnet und ist ungefähr.</p>
-  </form>
+    <div id="tabPlace" class="stack">
+      <form class="field search" id="placeForm" autocomplete="off"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="placeQ" type="search" enterkeyhint="search" placeholder="Stadt, Straße, Bahnhof oder DS100" aria-label="Ort oder Bahnhof suchen"></form>
+      <p class="hint" id="placeHint">Tipp: Auch DS100-Kürzel wie <b>MH</b> und eure eingetragenen Objekte werden gefunden.</p>
+      <div class="list" id="placeRes" hidden></div>
+    </div>
+    <form id="kmForm" class="stack" autocomplete="off" hidden>
+      <div class="kmrow">
+        <div class="field"><label for="kmLine">Strecke</label><input id="kmLine" inputmode="numeric" list="kmLines" placeholder="5503" maxlength="12" enterkeyhint="next"></div>
+        <div class="field"><label for="kmVal">Kilometer</label><input id="kmVal" inputmode="decimal" placeholder="21,3" maxlength="12" enterkeyhint="search"></div>
+      </div>
+      <p class="hint" id="kmLineName"></p>
+      <p class="err" id="kmErr"></p>
+      <button class="btn primary block" type="submit" id="kmGo">Hinspringen</button>
+      <p class="hint">Kilometer als <b>21,3</b> oder <b>21+350</b> (für km 21,350). Die Stelle wird aus den nächsten Kilometersteinen berechnet und ist ungefähr.</p>
+    </form>
+  </div>
   <datalist id="kmLines"></datalist>
 </section>
 
@@ -1449,8 +1469,8 @@ $("#kmVal").oninput=()=>{$("#kmErr").textContent="";};
 $("#btnKm").onclick=()=>{
   if($("#sheetKm").classList.contains("open")){closeSheets();return;}
   const last=store.get("sa_kmsearch",{}); if(!$("#kmLine").value&&last.line) $("#kmLine").value=last.line;
-  showKmLineName(); $("#kmErr").textContent=""; openSheet("#sheetKm");
-  setTimeout(()=>($("#kmLine").value?$("#kmVal"):$("#kmLine")).focus(),300);
+  showKmLineName(); $("#kmErr").textContent=""; setTab(stab); if(!$("#placeQ").value) renderRecents();
+  openSheet("#sheetKm"); focusSearch();
 };
 $("#kmForm").onsubmit=e=>{
   e.preventDefault(); const err=$("#kmErr");
@@ -1472,12 +1492,132 @@ $("#kmForm").onsubmit=e=>{
   kmPopup.on("close",()=>{kmMarker&&kmMarker.remove();kmMarker=null;});
 };
 
+/* ============ SUCHE: Orte (Photon/OpenStreetMap), Bahnhöfe, eigene Objekte ============ */
+let stab=store.get("sa_stab","place");
+function setTab(v){stab=v;store.set("sa_stab",v);$("#stab"+(v==="km"?"Km":"Place")).checked=true;$("#tabPlace").hidden=v!=="place";$("#kmForm").hidden=v!=="km";}
+function focusSearch(){setTimeout(()=>{ if(stab==="place") $("#placeQ").focus(); else ($("#kmLine").value?$("#kmVal"):$("#kmLine")).focus(); },320);}
+document.querySelectorAll("input[name=stab]").forEach(r=>r.onchange=e=>{setTab(e.target.value);focusSearch();});
+setTab(stab);
+
+const norm=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/ß/g,"ss");
+const PIN_SVG='<svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>';
+const ROAD_SVG='<svg viewBox="0 0 24 24"><path d="M8 3 5 21M16 3l3 18M12 4v3M12 10.5v3M12 17v3"/></svg>';
+const PLACE_LABEL={city:"Stadt",town:"Stadt",village:"Ort",hamlet:"Ort",suburb:"Stadtteil",quarter:"Stadtteil",neighbourhood:"Viertel",borough:"Stadtbezirk",isolated_dwelling:"Weiler",locality:"Ortslage"};
+const PLACE_ZOOM={city:12,town:13.5,village:14.5,hamlet:15.5,suburb:14,quarter:15,neighbourhood:15.5,borough:13};
+
+function localHits(q){
+  const nq=norm(q), up=q.trim().toUpperCase(), st=[], out=[];
+  if(nq.length<2) return out;
+  for(const f of allPts){
+    const p=f.properties; if(p.t!=="bst") continue;
+    const n=norm(p.n), bonus=(p.k==="station"||p.k==="halt")?0:15; let sc=-1;
+    if(p.r&&p.r.toUpperCase()===up) sc=100;
+    else if(n.startsWith(nq)) sc=70-bonus;
+    else if(n.includes(" "+nq)||n.includes("-"+nq)) sc=55-bonus;
+    else if(n.includes(nq)) sc=40-bonus;
+    else if(p.r&&up.length>=2&&p.r.toUpperCase().startsWith(up)) sc=30;
+    if(sc>=0) st.push({sc,f});
+  }
+  st.sort((a,b)=>b.sc-a.sc||(a.f.properties.n||"").length-(b.f.properties.n||"").length);
+  st.slice(0,5).forEach(({f})=>{const p=f.properties;
+    out.push({kind:"bst",title:p.n||p.r,sub:`${BST_KIND[p.k]||"Betriebsstelle"}${p.r?` · ${p.r}`:""}`,ll:f.geometry.coordinates,r:p.r,k:p.k});});
+  markers.filter(m=>norm(m.titel).includes(nq)||norm(m.notiz).includes(nq)).slice(0,4).forEach(m=>{
+    const t=TYPES[m.typ]||TYPES.sonst; out.push({kind:"obj",title:m.titel,sub:`${t.label} · eingetragen`,ll:[m.lng,m.lat],mid:m.id,typ:m.typ});});
+  return out;
+}
+async function placeHits(q,signal){
+  const r=await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lang=de&limit=7&bbox=8.9,47.2,13.9,50.6`,{signal});
+  if(!r.ok) throw new Error(r.status);
+  const j=await r.json(), out=[], seen=new Set();
+  for(const f of j.features||[]){
+    const p=f.properties||{};
+    if(p.osm_key==="railway"||p.osm_key==="public_transport") continue;   // Bahnhöfe kommen aus den eigenen Daten
+    let title, kind, zoom;
+    if(p.type==="house"||p.housenumber){title=[p.street||p.name,p.housenumber].filter(Boolean).join(" ");kind="Adresse";zoom=18;}
+    else if(p.type==="street"||p.osm_key==="highway"){title=p.name;kind="Straße";zoom=17;}
+    else if(p.osm_key==="place"){title=p.name;kind=PLACE_LABEL[p.osm_value]||"Ort";zoom=PLACE_ZOOM[p.osm_value]||14;}
+    else {title=p.name;kind="Ort";zoom=16;}
+    if(!title) continue;
+    const where=[p.postcode&&kind!=="Stadt"?p.postcode:"",(p.city&&p.city!==title?p.city:"")||(p.county&&p.county!==title?p.county:"")].filter(Boolean).join(" ");
+    const sub=[kind,where].filter(Boolean).join(" · ");
+    const key=title+"|"+sub; if(seen.has(key)) continue; seen.add(key);
+    out.push({kind:kind==="Adresse"||kind==="Straße"?"addr":"place",title,sub,ll:f.geometry.coordinates,zoom,
+      extent:(p.osm_key==="place"&&p.extent)?p.extent:null});
+  }
+  return out;
+}
+function iconFor(it){
+  if(it.kind==="bst") return '<span class="sic sic-bst"></span>';
+  if(it.kind==="obj"){const t=TYPES[it.typ]||TYPES.sonst;return `<span class="tag" style="background:${t.color}">${tagInner(t)}</span>`;}
+  return `<span class="sic">${it.kind==="addr"?ROAD_SVG:PIN_SVG}</span>`;
+}
+let shown=[];
+function renderItems(items,head){
+  shown=items;
+  $("#placeRes").hidden=!items.length;
+  $("#placeRes").innerHTML=items.map((it,i)=>`<button type="button" class="opt sres" data-i="${i}">${iconFor(it)}<span class="lbl"><b>${esc(it.title)}</b><small>${esc(it.sub)}</small></span></button>`).join("");
+  if(head!=null) $("#placeHint").innerHTML=head;
+}
+function renderRecents(){
+  const rec=store.get("sa_recent",[]);
+  if(rec.length) renderItems(rec,'<span class="searchhead">Zuletzt gesucht</span>');
+  else renderItems([],'Tipp: Auch DS100-Kürzel wie <b>MH</b> und eure eingetragenen Objekte werden gefunden.');
+}
+let placeT=null, placeCtl=null;
+$("#placeQ").oninput=()=>{
+  const q=$("#placeQ").value.trim();
+  clearTimeout(placeT); placeCtl&&placeCtl.abort();
+  if(q.length<2){renderRecents();return;}
+  const loc=localHits(q);
+  renderItems(loc, q.length>=3?"Sucht …":(loc.length?"":"Keine Treffer"));
+  if(q.length<3) return;
+  placeT=setTimeout(async()=>{
+    placeCtl=new AbortController();
+    try{
+      const pl=await placeHits(q,placeCtl.signal);
+      if($("#placeQ").value.trim()!==q) return;
+      const all=[...loc,...pl];
+      renderItems(all, all.length?"":"Nichts gefunden. Versuch es mit einem anderen Namen.");
+    }catch(e){ if(e.name==="AbortError") return; renderItems(loc,"Die Ortssuche ist gerade nicht erreichbar. Bahnhöfe und Objekte werden trotzdem gefunden."); }
+  },300);
+};
+$("#placeForm").onsubmit=e=>{e.preventDefault(); if(shown[0]) pickItem(shown[0]);};
+$("#placeRes").addEventListener("click",e=>{const b=e.target.closest("[data-i]"); if(b) pickItem(shown[+b.dataset.i]);});
+function pickItem(it){
+  if(!it) return;
+  const rec=store.get("sa_recent",[]).filter(x=>!(x.title===it.title&&x.sub===it.sub));
+  rec.unshift(it); store.set("sa_recent",rec.slice(0,5));
+  goToItem(it);
+}
+function goToItem(it){
+  $("#placeQ").blur(); closeSheets(); setFollow(false); vibrate(10);
+  openPopup&&openPopup.remove(); kmPopup&&kmPopup.remove(); kmMarker&&kmMarker.remove(); kmMarker=null;
+  const [lng,lat]=it.ll;
+  if(it.kind==="obj"){
+    const m=markers.find(x=>x.id===it.mid); if(!m){toast("Dieses Objekt gibt es nicht mehr");return;}
+    map.flyTo({center:[m.lng,m.lat],zoom:Math.max(map.getZoom(),17),duration:1000,essential:true});
+    openPopup=new maplibregl.Popup({offset:[0,-40],maxWidth:"290px"}).setLngLat([m.lng,m.lat]).setHTML(popupHtml(m)).addTo(map);
+    const eb=openPopup.getElement().querySelector("[data-edit]"); if(eb) eb.onclick=()=>startEdit(m,null);
+    return;
+  }
+  if(it.extent){const [w,n,e,s]=it.extent; map.fitBounds([[w,s],[e,n]],{padding:60,duration:1000,maxZoom:16});}
+  else map.flyTo({center:[lng,lat],zoom:it.kind==="bst"?16.5:(it.zoom||15),duration:1000,essential:true});
+  if(it.kind==="place") return;   // Städte und Orte: nur hinfliegen
+  const el=document.createElement("div"); el.className="kmpin";
+  kmMarker=new maplibregl.Marker({element:el}).setLngLat([lng,lat]).addTo(map);
+  const html = it.kind==="bst"
+    ? `<div class="pop"><span class="t">${esc(BST_KIND[it.k]||"Betriebsstelle")}${it.r?` · DS100 <b>${esc(it.r)}</b>`:""}</span><h4>${esc(it.title)}</h4>${refChips(nearLineRefs(lat,lng,150),lat,lng)}${navLinks({lat,lng})}</div>`
+    : `<div class="pop"><span class="t">${esc(it.sub)}</span><h4>${esc(it.title)}</h4>${navLinks({lat,lng})}</div>`;
+  kmPopup=new maplibregl.Popup({offset:16,maxWidth:"290px"}).setLngLat([lng,lat]).setHTML(html).addTo(map);
+  kmPopup.on("close",()=>{kmMarker&&kmMarker.remove();kmMarker=null;});
+}
+
 /* ============ EINFÜHRUNG für neue Nutzer ============ */
 function tourSteps(){
   const admin=me&&me.role==="admin";
   return [
     {title:`Willkommen${me&&me.name?", "+me.name.split(" ")[0]:""}!`, text:"Der Streckenatlas zeigt dir die Bahnstrecken in Bayern auf amtlichen Luftbildern. Gemeinsam mit den Kollegen tragt ihr Anlagen wie Stellwerke ein. In einer Minute zeige ich dir die wichtigsten Knöpfe."},
-    {sel:"#btnKm", title:"Kilometer suchen", text:"Streckennummer und Kilometer eingeben, z. B. 5503 und 21,3. Die Karte springt an die Stelle, und du kannst direkt die Navigation dorthin starten."},
+    {sel:"#btnKm", title:"Suchen", text:"Finde Städte, Straßen, Bahnhöfe (auch per DS100 wie MH) und eure eingetragenen Objekte. Im Reiter „Kilometer“ gibst du Streckennummer und km ein, z. B. 5503 und 21,3, und springst direkt an die Stelle."},
     {sel:"#btnLayers", title:"Karte & Strecken", text:"Hier wählst du die Kartenansicht und schaltest einzelne Strecken an oder aus. Tipp: Erst „Alle aus“, dann deine Streckennummer suchen und einschalten. Bahnhöfe, Bahnübergänge und Kilometer siehst du dann nur an deinen Strecken."},
     {sel:"#btnAdd", title:"Objekt hinzufügen", text:"Tippe auf das Plus und dann auf die Stelle in der Karte, wo z. B. ein ESTW steht. Art wählen, Bezeichnung eingeben, speichern und mit „Ja, hinzufügen“ bestätigen. Danach sehen es alle Kollegen."},
     {title:"Objekte & Navigation", text:"Tippe kurz auf einen Pin, eine Strecke oder einen Bahnhof: Du siehst Streckennummer, ungefähren Bahnkilometer und den Knopf „Navigation starten“."+(admin?" Als Admin entfernst du Objekte, indem du den Pin lange gedrückt hältst.":" Entfernen können nur Admins. Ist etwas falsch eingetragen, sag deinem Admin Bescheid.")},
