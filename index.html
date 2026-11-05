@@ -117,7 +117,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 @media (min-width:760px){.grab{display:none}}
 .sheet header{display:flex;align-items:center;gap:8px;padding:12px 12px 10px 20px}
 .sheet h2{margin:0;font-size:20px;font-weight:800;flex:1;letter-spacing:-.01em}
-.x{width:36px;height:36px;border-radius:50%;border:0;background:var(--grey-1);display:grid;place-items:center;cursor:pointer}
+.x{width:40px;height:40px;position:relative;border-radius:50%;border:0;background:var(--grey-1);display:grid;place-items:center;cursor:pointer}
 .x svg{width:18px;height:18px;stroke:var(--ink);stroke-width:2.2;fill:none;stroke-linecap:round}
 .body{overflow:auto;padding:0 20px 22px;display:flex;flex-direction:column;gap:22px;-webkit-overflow-scrolling:touch}
 .group h3{margin:0 0 6px;font-size:13px;font-weight:700;color:var(--muted)}
@@ -292,6 +292,8 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .kmrow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .kmrow input{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
 .kmpin{width:22px;height:22px;border-radius:50%;background:var(--red);border:4px solid #fff;box-shadow:0 0 0 6px rgba(236,0,22,.25),0 2px 6px rgba(0,0,0,.4);animation:pop .3s var(--ease)}
+.x::before{content:"";position:absolute;inset:-8px}
+.row2{display:grid;grid-template-columns:1fr 2fr;gap:10px}
 .toast{position:fixed;z-index:60;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);
   transform:translate(-50%,20px);opacity:0;transition:all .3s var(--ease);pointer-events:none;
   background:var(--inv-bg);color:var(--inv-fg);padding:12px 18px;border-radius:12px;font-weight:600;max-width:calc(100% - 110px);text-align:center;box-shadow:var(--shadow)}
@@ -405,7 +407,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
     <div class="group"><h3>Art</h3><div class="types" id="typePick"></div></div>
     <div class="field"><label for="fTitel">Bezeichnung</label><input id="fTitel" required maxlength="80" placeholder="z. B. ESTW Hannover-Linden"></div>
     <div class="field"><label for="fNotiz">Notiz (optional)</label><textarea id="fNotiz" maxlength="1000" placeholder="Zugang, Besonderheiten, Strecken-km …"></textarea></div>
-    <button class="btn primary block" type="submit" id="addSave">Speichern</button>
+    <div class="row2"><button class="btn" type="button" data-close>Abbrechen</button><button class="btn primary" type="submit" id="addSave">Speichern</button></div>
   </form>
 </section>
 
@@ -1267,7 +1269,16 @@ function openSheet(sel){
   document.querySelectorAll(".sheet").forEach(s=>s.classList.toggle("open","#"+s.id===sel));
   $("#scrim").classList.toggle("on", sel!=="#sheetAdd");
 }
-document.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",closeSheets));
+document.querySelectorAll("[data-close]").forEach(b=>{
+  let tStart=null;
+  b.addEventListener("touchstart",e=>{tStart=e.touches[0];},{passive:true});
+  b.addEventListener("touchend",e=>{
+    const t=e.changedTouches[0];
+    if(tStart&&Math.hypot(t.clientX-tStart.clientX,t.clientY-tStart.clientY)<15){e.preventDefault();closeSheets();}
+    tStart=null;
+  });
+  b.addEventListener("click",closeSheets);
+});
 $("#scrim").onclick=closeSheets;
 $("#btnLayers").onclick=()=>{$("#sheetLayers").classList.contains("open")?closeSheets():openSheet("#sheetLayers");};
 $("#userChip").onclick=()=>{renderUserSheet();openSheet("#sheetUser");};
@@ -1276,8 +1287,8 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("#personModal
 /* Sheet nach unten wischen zum Schließen */
 document.querySelectorAll(".sheet").forEach(sheet=>{
   const handle=sheet.querySelector(".grab"), head=sheet.querySelector("header"); let y0=null,dy=0;
-  const start=e=>{y0=e.touches[0].clientY;dy=0;sheet.style.transition="none";};
-  const move=e=>{if(y0===null)return;dy=Math.max(0,e.touches[0].clientY-y0);sheet.style.transform=`translateY(${dy}px)`;};
+  const start=e=>{if(e.target.closest("button,input,select,a")){y0=null;return;} y0=e.touches[0].clientY;dy=0;};
+  const move=e=>{if(y0===null)return;dy=Math.max(0,e.touches[0].clientY-y0);if(dy>6){sheet.style.transition="none";sheet.style.transform=`translateY(${dy}px)`;}};
   const end=()=>{if(y0===null)return;sheet.style.transition="";sheet.style.transform="";if(dy>90)closeSheets();y0=null;};
   [handle,head].forEach(h=>{h.addEventListener("touchstart",start,{passive:true});h.addEventListener("touchmove",move,{passive:true});h.addEventListener("touchend",end);});
 });
