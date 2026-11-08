@@ -335,10 +335,10 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .conv.unread .lbl small{color:var(--ink);font-weight:700}
 .cbadge{min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--red);color:#fff;font-size:12px;font-weight:800;display:grid;place-items:center;flex:none}
 .chatempty{margin:auto;text-align:center;color:var(--muted);max-width:260px;padding:20px}
-.chatbar{display:flex;align-items:flex-end;gap:8px;padding:10px 12px;border-top:1px solid var(--grey-1);background:var(--white)}
-.chatbar textarea{flex:1;min-width:0;resize:none;border:1.5px solid transparent;background:var(--grey-1);border-radius:20px;padding:10px 14px;font-size:16px;line-height:1.3;max-height:120px;color:var(--ink)}
+.chatbar{display:flex;align-items:flex-end;gap:8px;padding:10px 12px 12px;border-top:1px solid var(--grey-1);background:var(--white)}
+.chatbar textarea{flex:1;min-width:0;resize:none;border:1.5px solid transparent;background:var(--grey-1);border-radius:22px;padding:11px 16px;font:16px/1.3 var(--sans);height:44px;min-height:44px;max-height:120px;color:var(--ink);overflow-y:auto;display:block;box-sizing:border-box}
 .chatbar textarea:focus{outline:none;border-color:var(--ink);background:var(--white)}
-.chatsend,.chatloc{width:42px;height:42px;border-radius:50%;border:0;display:grid;place-items:center;cursor:pointer;flex:none}
+.chatsend,.chatloc{width:44px;height:44px;border-radius:50%;border:0;display:grid;place-items:center;cursor:pointer;flex:none}
 .chatsend{background:var(--red);color:#fff}
 .chatsend:disabled{opacity:.45}
 .chatloc{background:var(--grey-1);color:var(--ink)}
@@ -1791,8 +1791,8 @@ function openConv(c){
   chatConv=c; $("#chatTitle").textContent=c===TEAM?"Team":nameOf(c); $("#chatBack").hidden=false;
   $("#chatConvs").hidden=true; $("#chatList").hidden=false; $("#chatForm").hidden=false;
   $("#chatInput").placeholder=c===TEAM?"Nachricht an das Team":`Nachricht an ${nameOf(c).split(" ")[0]}`;
-  renderChat(); markRead(c);
-  setTimeout(()=>{$("#chatList").scrollTop=$("#chatList").scrollHeight;},30);
+  renderChat(); markRead(c); autoGrow();
+  setTimeout(()=>{autoGrow();$("#chatList").scrollTop=$("#chatList").scrollHeight;},30);
 }
 $("#convList").addEventListener("click",e=>{const b=e.target.closest("[data-conv]"); if(b) openConv(b.dataset.conv);});
 $("#chatSearch").oninput=renderConvs;
@@ -1832,7 +1832,12 @@ $("#btnChat").onclick=()=>{
 };
 new MutationObserver(()=>{chatOpen=$("#sheetChat").classList.contains("open");}).observe($("#sheetChat"),{attributes:true,attributeFilter:["class"]});
 const chatInput=$("#chatInput");
-const autoGrow=()=>{chatInput.style.height="auto";chatInput.style.height=Math.min(120,chatInput.scrollHeight)+"px";$("#chatSend").disabled=!chatInput.value.trim();};
+const autoGrow=()=>{
+  $("#chatSend").disabled=!chatInput.value.trim();
+  if(!chatInput.offsetParent) return;          // unsichtbar: Höhe nicht messen
+  chatInput.style.height="auto";
+  chatInput.style.height=Math.min(120,Math.max(44,chatInput.scrollHeight))+"px";
+};
 chatInput.addEventListener("input",autoGrow); autoGrow();
 chatInput.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&!/iPhone|iPad|Android/.test(navigator.userAgent)){e.preventDefault();$("#chatForm").requestSubmit();}});
 async function sendChat(m){
