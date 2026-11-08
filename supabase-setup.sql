@@ -83,3 +83,16 @@ create policy "Chat lesen"     on public.messages for select to authenticated us
 create policy "Chat schreiben" on public.messages for insert to authenticated with check (is_member() and user_id = auth.uid());
 create policy "Chat löschen"   on public.messages for delete to authenticated using (user_id = auth.uid() or is_admin());
 alter publication supabase_realtime add table public.messages;
+
+-- Direktnachrichten: recipient_id leer = Team, sonst nur Absender und Empfänger lesen
+alter table public.messages add column if not exists recipient_id uuid references public.profiles(id) on delete cascade;
+drop policy if exists "Chat lesen" on public.messages;
+create policy "Chat lesen" on public.messages for select to authenticated
+  using (is_member() and (recipient_id is null or user_id = auth.uid() or recipient_id = auth.uid()));
+drop policy if exists "Chat schreiben" on public.messages;
+create policy "Chat schreiben" on public.messages for insert to authenticated
+  with check (is_member() and user_id = auth.uid() and (recipient_id is null or recipient_id <> auth.uid()));
+drop policy if exists "Chat löschen" on public.messages;
+create policy "Chat löschen" on public.messages for delete to authenticated
+  using (user_id = auth.uid() or (is_admin() and recipient_id is null));
+create index if not exists messages_created_idx on public.messages (created_at desc);

@@ -310,8 +310,27 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .msg .locbtn{display:flex;align-items:center;gap:6px;border:0;border-radius:10px;padding:7px 10px;margin:2px 0;font-weight:700;cursor:pointer;background:rgba(0,0,0,.08);color:inherit}
 .msg.mine .locbtn{background:rgba(255,255,255,.2)}
 .msg .locbtn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.2}
-.msg .del{display:none;margin-top:6px;border:0;border-radius:8px;padding:5px 10px;font-weight:700;font-size:12px;cursor:pointer;background:rgba(0,0,0,.15);color:inherit}
-.msg.sel .del{display:inline-block}
+.msgact{flex:none;display:none;align-self:flex-start;gap:6px;margin:2px 0 6px}
+.msgact.mine{align-self:flex-end}
+.msgact.on{display:flex}
+.msgact button{border:0;border-radius:999px;padding:7px 14px;font-weight:700;font-size:13px;cursor:pointer;background:var(--grey-1);color:var(--ink)}
+.msgact .delbtn{background:var(--red-soft);color:var(--red)}
+.msgact .delbtn.armed{background:var(--red);color:#fff}
+.msg.sel{outline:2px solid var(--red);outline-offset:2px}
+.msg{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:pointer}
+.chattip{flex:none;align-self:center;font-size:12px;color:var(--muted);background:var(--grey-1);border-radius:999px;padding:5px 12px;margin:6px 0}
+.chatconvs{flex:1;overflow:auto;padding:0 16px 16px;display:flex;flex-direction:column;gap:12px}
+.conv{width:100%;border:0;border-top:1px solid var(--grey-1);background:var(--white);text-align:left;font:inherit;color:var(--ink);cursor:pointer;min-height:64px}
+.conv:active{background:var(--grey-1)}
+.conv .avatar{width:42px;height:42px;font-size:16px}
+.conv .avatar.team{background:var(--red);color:#fff}
+.conv .avatar.team svg{width:22px;height:22px;stroke:#fff;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.conv .lbl b{display:flex;gap:8px;align-items:baseline;font-weight:700}
+.conv .lbl b span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv .lbl b time{font-size:12px;font-weight:600;color:var(--muted);flex:none;font-variant-numeric:tabular-nums}
+.conv .lbl small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.conv.unread .lbl small{color:var(--ink);font-weight:700}
+.cbadge{min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--red);color:#fff;font-size:12px;font-weight:800;display:grid;place-items:center;flex:none}
 .chatempty{margin:auto;text-align:center;color:var(--muted);max-width:260px;padding:20px}
 .chatbar{display:flex;align-items:flex-end;gap:8px;padding:10px 12px;border-top:1px solid var(--grey-1);background:var(--white)}
 .chatbar textarea{flex:1;min-width:0;resize:none;border:1.5px solid transparent;background:var(--grey-1);border-radius:20px;padding:10px 14px;font-size:16px;line-height:1.3;max-height:120px;color:var(--ink)}
@@ -383,7 +402,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
     <svg viewBox="0 0 24 24"><path d="M12 3 2 8l10 5 10-5-10-5z"/><path d="m2 13 10 5 10-5"/></svg></button>
   <button class="fab" id="btnLocate" title="Mein Standort" aria-label="Mein Standort">
     <svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8z"/></svg></button>
-  <button class="fab" id="btnChat" title="Team-Chat" aria-label="Team-Chat"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.8 7L4 20.5l1.5-4.6A8 8 0 1 1 21 12z"/></svg><span class="badge" id="chatBadge" hidden></span></button>
+  <button class="fab" id="btnChat" title="Chat" aria-label="Chat"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.8 7L4 20.5l1.5-4.6A8 8 0 1 1 21 12z"/></svg><span class="badge" id="chatBadge" hidden></span></button>
   <button class="fab primary" id="btnAdd" title="Objekt hinzufügen" aria-label="Objekt hinzufügen">
     <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
 </div>
@@ -472,14 +491,19 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
   <datalist id="kmLines"></datalist>
 </section>
 
-<!-- Team-Chat -->
-<section class="sheet chat" id="sheetChat" aria-label="Team-Chat">
+<!-- Chat: Übersicht (Team + Kollegen) und Unterhaltung -->
+<section class="sheet chat" id="sheetChat" aria-label="Chat">
   <div class="grab"></div>
-  <header><h2>Team-Chat</h2><button class="x" data-close aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
-  <div class="chatlist" id="chatList" aria-live="polite"></div>
-  <form class="chatbar" id="chatForm" autocomplete="off">
+  <header><button class="backbtn" id="chatBack" hidden aria-label="Zurück zur Übersicht"><svg viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></svg></button><h2 id="chatTitle">Chat</h2><button class="x" data-close aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+  <div class="chatconvs" id="chatConvs">
+    <div class="field search" id="chatSearchField" hidden><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="chatSearch" type="search" placeholder="Kollegen suchen" aria-label="Kollegen suchen" autocomplete="off"></div>
+    <div class="list" id="convList"></div>
+    <p class="hint" id="convHint"></p>
+  </div>
+  <div class="chatlist" id="chatList" hidden aria-live="polite"></div>
+  <form class="chatbar" id="chatForm" autocomplete="off" hidden>
     <button type="button" class="chatloc" id="chatLoc" title="Meinen Standort senden" aria-label="Meinen Standort senden"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></button>
-    <textarea id="chatInput" rows="1" maxlength="2000" placeholder="Nachricht an das Team" aria-label="Nachricht"></textarea>
+    <textarea id="chatInput" rows="1" maxlength="2000" placeholder="Nachricht" aria-label="Nachricht"></textarea>
     <button type="submit" class="chatsend" id="chatSend" aria-label="Senden"><svg viewBox="0 0 24 24"><path d="M4 12 20 4l-4 16-4-7-8-1z"/></svg></button>
   </form>
 </section>
@@ -696,10 +720,11 @@ function supabaseBackend(){
     async listProfiles(){const {data,error}=await sb.from("profiles").select("*").order("created_at"); if(error) throw error; return data;},
     async setRole(id,role){const {error}=await sb.from("profiles").update({role}).eq("id",id); if(error) throw error;},
     subscribe(cb){sb.channel("markers").on("postgres_changes",{event:"*",schema:"public",table:"markers"},cb).subscribe();},
-    async listMessages(){const {data,error}=await sb.from("messages").select("*").order("created_at",{ascending:false}).limit(200);
+    async listMessages(){const {data,error}=await sb.from("messages").select("*").order("created_at",{ascending:false}).limit(500);
       if(error) throw new Error(/messages/.test(error.message)&&/exist|schema cache/.test(error.message)?"Der Chat ist noch nicht eingerichtet (SQL in Supabase ausführen).":error.message);
       return data.reverse();},
-    async sendMessage(m){const {error}=await sb.from("messages").insert(m); if(error) throw error;},
+    async sendMessage(m){const {error}=await sb.from("messages").insert(m);
+      if(error) throw new Error(/recipient_id/.test(error.message)?"Für Direktnachrichten bitte zuerst das SQL in Supabase ausführen.":error.message);},
     async deleteMessage(id){const {error,count}=await sb.from("messages").delete({count:"exact"}).eq("id",id); if(error) throw error; if(!count) throw new Error("Keine Berechtigung");},
     subscribeMessages(cb){sb.channel("messages").on("postgres_changes",{event:"*",schema:"public",table:"messages"},cb).subscribe();}
   };
@@ -1714,46 +1739,91 @@ function goToItem(it){
   kmPopup.on("close",()=>{kmMarker&&kmMarker.remove();kmMarker=null;});
 }
 
-/* ============ TEAM-CHAT ============ */
-let chatMsgs=[], chatOpen=false, chatReady=false;
-const readKey=()=>"sa_chat_read_"+(me?me.id:"x");
+/* ============ CHAT: Team-Kanal + Direktnachrichten ============ */
+let chatMsgs=[], chatOpen=false, chatConv=null;   // chatConv: "team" oder Profil-ID des Kollegen
+const TEAM="team";
+const TEAM_SVG='<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3 2.8-4.8 5.5-4.8s4.9 1.8 5.5 4.8"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.4c2.6.1 4.4 1.7 5 4.6"/></svg>';
+const convOf=m=>m.recipient_id?(m.user_id===me?.id?m.recipient_id:m.user_id):TEAM;
+const visible=m=>!m.recipient_id||m.user_id===me?.id||m.recipient_id===me?.id;
+const readKey=c=>"sa_chat_read_"+(me?me.id:"x")+"_"+c;
 const fmtTime=iso=>new Date(iso).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
+const nameOf=id=>profiles[id]?.name||profiles[id]?.email||"Unbekannt";
 function dayLabel(iso){
   const d=new Date(iso), t=new Date(), y=new Date(); y.setDate(t.getDate()-1);
   const same=(a,b)=>a.toDateString()===b.toDateString();
   return same(d,t)?"Heute":same(d,y)?"Gestern":d.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit",year:"numeric"});
 }
+function shortStamp(iso){const d=new Date(iso);return d.toDateString()===new Date().toDateString()?fmtTime(iso):d.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"});}
+function unreadIn(c){const last=store.get(readKey(c),"");return chatMsgs.filter(m=>convOf(m)===c&&m.user_id!==me?.id&&(!last||m.created_at>last)).length;}
 function updateChatBadge(){
-  const last=store.get(readKey(),"");
-  const n=chatMsgs.filter(m=>m.user_id!==me?.id && (!last||m.created_at>last)).length;
+  const convs=new Set(chatMsgs.map(convOf)); let n=0; convs.forEach(c=>n+=unreadIn(c));
   $("#chatBadge").hidden=!n; $("#chatBadge").textContent=n>99?"99+":n;
 }
+function markRead(c){const ms=chatMsgs.filter(m=>convOf(m)===c); if(ms.length) store.set(readKey(c),ms[ms.length-1].created_at); updateChatBadge();}
+
+/* Übersicht: Team oben, dann Kollegen nach letzter Nachricht */
+function colleagues(){return Object.values(profiles).filter(p=>p.id!==me?.id&&p.role!=="wartend");}
+function preview(m){ if(!m) return ""; const who=m.user_id===me?.id?"Du: ":(convOf(m)===TEAM?nameOf(m.user_id).split(" ")[0]+": ":""); return who+(m.body||"Standort geteilt"); }
+function renderConvs(){
+  const last={}; chatMsgs.forEach(m=>{last[convOf(m)]=m;});
+  const q=norm($("#chatSearch").value.trim());
+  const people=colleagues().filter(p=>!q||norm(p.name).includes(q)||norm(p.email).includes(q))
+    .sort((a,b)=>((last[b.id]?.created_at||"")>(last[a.id]?.created_at||"")?1:(last[b.id]?.created_at||"")<(last[a.id]?.created_at||"")?-1:(a.name||"").localeCompare(b.name||"")));
+  $("#chatSearchField").hidden=colleagues().length<6;
+  const row=(id,name,av,lm)=>{const u=unreadIn(id);
+    return `<button type="button" class="opt conv${u?" unread":""}" data-conv="${esc(id)}">${av}<span class="lbl"><b><span>${esc(name)}</span>${lm?`<time>${shortStamp(lm.created_at)}</time>`:""}</b><small>${esc(lm?preview(lm):(id===TEAM?"Nachrichten an alle freigeschalteten Kollegen":"Noch keine Nachrichten"))}</small></span>${u?`<span class="cbadge">${u>99?"99+":u}</span>`:""}</button>`;};
+  let html=q?"":row(TEAM,"Team",`<span class="avatar team">${TEAM_SVG}</span>`,last[TEAM]);
+  html+=people.map(p=>row(p.id,p.name||p.email,`<span class="avatar">${esc((p.name||p.email||"?")[0].toUpperCase())}</span>`,last[p.id])).join("");
+  $("#convList").innerHTML=html||'<div class="opt"><span class="hint">Niemand gefunden.</span></div>';
+  $("#convHint").textContent=colleagues().length?"Nachrichten an einzelne Kollegen sieht nur ihr beide.":"Sobald du Kollegen freischaltest, kannst du sie hier auch einzeln anschreiben.";
+}
+function showConvList(){
+  chatConv=null; $("#chatTitle").textContent="Chat"; $("#chatBack").hidden=true;
+  $("#chatConvs").hidden=false; $("#chatList").hidden=true; $("#chatForm").hidden=true;
+  renderConvs();
+}
+function openConv(c){
+  chatConv=c; $("#chatTitle").textContent=c===TEAM?"Team":nameOf(c); $("#chatBack").hidden=false;
+  $("#chatConvs").hidden=true; $("#chatList").hidden=false; $("#chatForm").hidden=false;
+  $("#chatInput").placeholder=c===TEAM?"Nachricht an das Team":`Nachricht an ${nameOf(c).split(" ")[0]}`;
+  renderChat(); markRead(c);
+  setTimeout(()=>{$("#chatList").scrollTop=$("#chatList").scrollHeight;},30);
+}
+$("#convList").addEventListener("click",e=>{const b=e.target.closest("[data-conv]"); if(b) openConv(b.dataset.conv);});
+$("#chatSearch").oninput=renderConvs;
+$("#chatBack").onclick=showConvList;
+
+/* Unterhaltung */
+let selMsg=null;
 function renderChat(){
-  const el=$("#chatList");
-  if(!chatMsgs.length){el.innerHTML='<p class="chatempty">Noch keine Nachrichten. Schreib als Erstes etwas an dein Team.</p>';return;}
-  let html="", lastDay="", lastUser="", lastT=0;
-  for(const m of chatMsgs){
+  const el=$("#chatList"); if(!chatConv) return;
+  const ms=chatMsgs.filter(m=>convOf(m)===chatConv);
+  if(!ms.length){el.innerHTML=`<p class="chatempty">${chatConv===TEAM?"Noch keine Nachrichten im Team. Schreib als Erstes etwas.":"Noch keine Nachrichten. Diese Unterhaltung sehen nur ihr beide."}</p>`;return;}
+  const canDelAny=ms.some(m=>m.user_id===me?.id||(me?.role==="admin"&&!m.recipient_id));
+  let html=(canDelAny&&!store.get("sa_chat_tip",false))?'<div class="chattip">Tipp: Eigene Nachricht antippen, um sie zu löschen</div>':"";
+  let lastDay="", lastUser="", lastT=0;
+  for(const m of ms){
     const day=dayLabel(m.created_at); if(day!==lastDay){html+=`<div class="chatday">${esc(day)}</div>`;lastDay=day;lastUser="";}
     const mine=m.user_id===me?.id, t=new Date(m.created_at).getTime();
     const first=m.user_id!==lastUser||t-lastT>10*60*1000; lastUser=m.user_id; lastT=t;
-    const who=!mine&&first?`<span class="who">${esc(profiles[m.user_id]?.name||"Unbekannt")}</span>`:"";
+    const who=!mine&&first&&chatConv===TEAM?`<span class="who">${esc(nameOf(m.user_id))}</span>`:"";
     const loc=m.lat!=null?`<button type="button" class="locbtn" data-lat="${m.lat}" data-lng="${m.lng}"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>Standort auf Karte zeigen</button>`:"";
-    const canDel=mine||me?.role==="admin";
-    html+=`<div class="msg${mine?" mine":""}${first?" first":""}" data-id="${esc(m.id)}">${who}${m.body?`<span class="txt">${esc(m.body)}</span>`:""}${loc}<time>${fmtTime(m.created_at)}</time>${canDel?`<button type="button" class="del" data-del="${esc(m.id)}">Nachricht löschen</button>`:""}</div>`;
+    const canDel=mine||(me?.role==="admin"&&!m.recipient_id);
+    html+=`<div class="msg${mine?" mine":""}${first?" first":""}${selMsg===m.id?" sel":""}" data-id="${esc(m.id)}" data-can="${canDel?1:0}">${who}${m.body?`<span class="txt">${esc(m.body)}</span>`:""}${loc}<time>${fmtTime(m.created_at)}</time></div>`;
+    if(canDel) html+=`<div class="msgact${mine?" mine":""}${selMsg===m.id?" on":""}" data-for="${esc(m.id)}"><button type="button" class="delbtn" data-del="${esc(m.id)}">Löschen</button><button type="button" data-cancel="1">Abbrechen</button></div>`;
   }
   const atBottom=el.scrollHeight-el.scrollTop-el.clientHeight<80;
   el.innerHTML=html;
-  if(atBottom||chatOpen) el.scrollTop=el.scrollHeight;
+  if(atBottom&&!selMsg) el.scrollTop=el.scrollHeight;
 }
 async function loadChat(){
-  try{ chatMsgs=await api.listMessages(); chatReady=true; renderChat(); updateChatBadge(); if(chatOpen) markRead(); }
-  catch(e){ chatReady=false; $("#chatList").innerHTML=`<p class="chatempty">${esc(e.message||"Chat konnte nicht geladen werden.")}</p>`; }
+  try{ chatMsgs=(await api.listMessages()).filter(visible); updateChatBadge(); if(chatOpen){ chatConv?(renderChat(),markRead(chatConv)):renderConvs(); } }
+  catch(e){ $("#convHint").textContent=e.message||"Chat konnte nicht geladen werden."; }
 }
-function markRead(){ if(chatMsgs.length) store.set(readKey(),chatMsgs[chatMsgs.length-1].created_at); updateChatBadge(); }
 $("#btnChat").onclick=()=>{
   if($("#sheetChat").classList.contains("open")){closeSheets();return;}
-  closeSheets(); setAddMode(false); openSheet("#sheetChat"); chatOpen=true;
-  renderChat(); markRead(); setTimeout(()=>{$("#chatList").scrollTop=$("#chatList").scrollHeight;},50);
+  closeSheets(); setAddMode(false); openSheet("#sheetChat"); chatOpen=true; selMsg=null;
+  if(chatConv) openConv(chatConv); else showConvList();
 };
 new MutationObserver(()=>{chatOpen=$("#sheetChat").classList.contains("open");}).observe($("#sheetChat"),{attributes:true,attributeFilter:["class"]});
 const chatInput=$("#chatInput");
@@ -1761,6 +1831,7 @@ const autoGrow=()=>{chatInput.style.height="auto";chatInput.style.height=Math.mi
 chatInput.addEventListener("input",autoGrow); autoGrow();
 chatInput.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&!/iPhone|iPad|Android/.test(navigator.userAgent)){e.preventDefault();$("#chatForm").requestSubmit();}});
 async function sendChat(m){
+  if(chatConv&&chatConv!==TEAM) m.recipient_id=chatConv;
   try{ await api.sendMessage(m); vibrate(10); if(api.demo) await loadChat(); }
   catch(e){ toast("Senden fehlgeschlagen: "+(e.message||"")); throw e; }
 }
@@ -1776,6 +1847,13 @@ $("#chatLoc").onclick=()=>{
   toast("Standort wird ermittelt …");
   navigator.geolocation.getCurrentPosition(p=>send([p.coords.longitude,p.coords.latitude]),()=>toast("Standort nicht verfügbar. Bitte im Browser erlauben."),{enableHighAccuracy:true,timeout:15000});
 };
+/* Löschen: Nachricht antippen (oder lange drücken) -> „Löschen“ -> nochmal bestätigen */
+function selectMsg(id){selMsg=selMsg===id?null:id; if(selMsg) store.set("sa_chat_tip",true); renderChat();
+  if(selMsg){const a=document.querySelector(`.msgact[data-for="${CSS.escape(selMsg)}"]`); a&&a.scrollIntoView({block:"nearest",behavior:"smooth"});}}
+let pressT=null;
+$("#chatList").addEventListener("pointerdown",e=>{const m=e.target.closest(".msg[data-can='1']"); if(!m||e.target.closest(".locbtn")) return; pressT=setTimeout(()=>{pressT="done";vibrate(20);selectMsg(m.dataset.id);},500);});
+["pointerup","pointercancel","pointerleave"].forEach(t=>$("#chatList").addEventListener(t,()=>{if(pressT&&pressT!=="done")clearTimeout(pressT);}));
+$("#chatList").addEventListener("contextmenu",e=>{if(e.target.closest(".msg"))e.preventDefault();});
 $("#chatList").addEventListener("click",async e=>{
   const lb=e.target.closest(".locbtn");
   if(lb){
@@ -1784,37 +1862,43 @@ $("#chatList").addEventListener("click",async e=>{
     const el=document.createElement("div"); el.className="kmpin";
     kmMarker=new maplibregl.Marker({element:el}).setLngLat([lng,lat]).addTo(map);
     map.flyTo({center:[lng,lat],zoom:17,duration:1000,essential:true});
-    const who=lb.closest(".msg")?.classList.contains("mine")?"Dein Standort":"Standort aus dem Chat";
-    kmPopup=new maplibregl.Popup({offset:16,maxWidth:"280px"}).setLngLat([lng,lat]).setHTML(`<div class="pop"><span class="t">${who}</span>${refChips(nearLineRefs(lat,lng,200),lat,lng)}${navLinks({lat,lng})}</div>`).addTo(map);
+    const mm=chatMsgs.find(x=>x.id===lb.closest(".msg")?.dataset.id);
+    const who=mm&&mm.user_id===me?.id?"Dein Standort":`Standort von ${mm?nameOf(mm.user_id):"Kollege"}`;
+    kmPopup=new maplibregl.Popup({offset:16,maxWidth:"280px"}).setLngLat([lng,lat]).setHTML(`<div class="pop"><span class="t">${esc(who)}${mm?` · ${shortStamp(mm.created_at)}`:""}</span>${refChips(nearLineRefs(lat,lng,200),lat,lng)}${navLinks({lat,lng})}</div>`).addTo(map);
     kmPopup.on("close",()=>{kmMarker&&kmMarker.remove();kmMarker=null;});
     return;
   }
+  if(e.target.closest("[data-cancel]")){selMsg=null;renderChat();return;}
   const db=e.target.closest("[data-del]");
   if(db){
-    if(!db.classList.contains("armed")){db.classList.add("armed");db.textContent="Wirklich löschen?";return;}
-    try{await api.deleteMessage(db.dataset.del); chatMsgs=chatMsgs.filter(m=>m.id!==db.dataset.del); renderChat();}catch(err){toast(err.message||"Löschen fehlgeschlagen");}
+    if(!db.classList.contains("armed")){db.classList.add("armed");db.textContent="Wirklich löschen?";vibrate(15);return;}
+    db.disabled=true;
+    try{await api.deleteMessage(db.dataset.del); chatMsgs=chatMsgs.filter(m=>m.id!==db.dataset.del); selMsg=null; renderChat(); toast("Nachricht gelöscht");}
+    catch(err){toast(err.message||"Löschen fehlgeschlagen");db.disabled=false;}
     return;
   }
-  const msg=e.target.closest(".msg");
-  if(msg&&msg.querySelector(".del")){document.querySelectorAll(".msg.sel").forEach(x=>{if(x!==msg)x.classList.remove("sel");}); msg.classList.toggle("sel");}
+  if(pressT==="done"){pressT=null;return;}
+  const msg=e.target.closest(".msg[data-can='1']"); if(msg) selectMsg(msg.dataset.id);
 });
 /* Tastatur auf dem iPhone: Chat-Fenster über der Tastatur halten */
 if(window.visualViewport){
-  const fit=()=>{const sh=$("#sheetChat"); if(!chatOpen){sh.style.bottom="";return;}
+  const fit=()=>{const sh=$("#sheetChat"); if(!chatOpen){sh.style.bottom="";sh.style.maxHeight="";return;}
     const kb=Math.max(0,window.innerHeight-visualViewport.height-visualViewport.offsetTop);
     sh.style.bottom=kb?kb+"px":""; sh.style.maxHeight=kb?(visualViewport.height-20)+"px":"";
-    if(kb) $("#chatList").scrollTop=$("#chatList").scrollHeight;};
+    if(kb&&chatConv) $("#chatList").scrollTop=$("#chatList").scrollHeight;};
   visualViewport.addEventListener("resize",fit); visualViewport.addEventListener("scroll",fit);
 }
 function onChatChange(payload){
   if(payload.eventType==="INSERT"){
-    const m=payload.new; if(chatMsgs.some(x=>x.id===m.id)) return;
-    chatMsgs.push(m); if(chatMsgs.length>300) chatMsgs.shift();
-    renderChat();
-    if(chatOpen) markRead();
-    else { updateChatBadge(); if(m.user_id!==me?.id){ toast(`Neue Nachricht von ${profiles[m.user_id]?.name||"Kollege"}`); vibrate([30,40,30]); } }
+    const m=payload.new; if(!visible(m)||chatMsgs.some(x=>x.id===m.id)) return;
+    chatMsgs.push(m); if(chatMsgs.length>600) chatMsgs.shift();
+    const c=convOf(m);
+    if(chatOpen&&chatConv===c){ renderChat(); markRead(c); }
+    else { updateChatBadge(); if(chatOpen&&!chatConv) renderConvs();
+      if(m.user_id!==me?.id){ toast(c===TEAM?`Neue Nachricht im Team von ${nameOf(m.user_id)}`:`${nameOf(m.user_id)} schreibt dir`); vibrate([30,40,30]); } }
   } else if(payload.eventType==="DELETE"){
-    chatMsgs=chatMsgs.filter(x=>x.id!==payload.old?.id); renderChat(); updateChatBadge();
+    chatMsgs=chatMsgs.filter(x=>x.id!==payload.old?.id); updateChatBadge();
+    if(chatOpen) chatConv?renderChat():renderConvs();
   }
 }
 
@@ -1827,7 +1911,7 @@ function tourSteps(){
     {sel:"#btnLayers", title:"Karte & Strecken", text:"Hier wählst du die Kartenansicht und schaltest einzelne Strecken an oder aus. Tipp: Erst „Alle aus“, dann deine Streckennummer suchen und einschalten. Bahnhöfe, Bahnübergänge und Kilometer siehst du dann nur an deinen Strecken."},
     {sel:"#btnAdd", title:"Objekt hinzufügen", text:"Tippe auf das Plus und dann auf die Stelle in der Karte, wo z. B. ein ESTW steht. Art wählen, Bezeichnung eingeben, speichern und mit „Ja, hinzufügen“ bestätigen. Danach sehen es alle Kollegen."},
     {title:"Objekte & Navigation", text:"Tippe kurz auf einen Pin, eine Strecke oder einen Bahnhof: Du siehst Streckennummer, ungefähren Bahnkilometer und den Knopf „Navigation starten“."+(admin?" Als Admin entfernst du Objekte, indem du den Pin lange gedrückt hältst.":" Entfernen können nur Admins. Ist etwas falsch eingetragen, sag deinem Admin Bescheid.")},
-    {sel:"#btnChat", title:"Team-Chat", text:"Hier schreibst du mit allen freigeschalteten Kolleginnen und Kollegen. Mit dem Standort-Knopf schickst du deinen Standort, den die anderen direkt auf der Karte öffnen können. Bitte keine Zugangscodes oder Passwörter in den Chat schreiben."},
+    {sel:"#btnChat", title:"Chat", text:"Schreib dem ganzen Team oder einzelnen Kollegen. Einzelnachrichten sehen nur ihr beide. Mit dem Standort-Knopf schickst du deinen Standort. Eigene Nachrichten löschst du, indem du sie antippst. Bitte keine Zugangscodes oder Passwörter in den Chat schreiben."},
     {sel:"#btnLocate", title:"Dein Standort", text:"Zeigt dich als blauen Punkt und fliegt ganz nah heran. Die Karte folgt dir, bis du sie selbst verschiebst. Einmal tippen holt dich zurück."},
     {sel:"#btnCompass", title:"Drehen & Neigen", text:"Mit zwei Fingern drehst du die Karte, mit zwei Fingern nach oben wischen neigst du sie. Der Kompass zeigt Norden. Antippen richtet die Karte wieder gerade aus."},
     {sel:"#btnReload", title:"Aktualisieren", text:"Tippe auf das Logo, um die App neu zu laden und die neueste Version zu holen."},
