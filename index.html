@@ -82,6 +82,9 @@ button,input,select,textarea{font:inherit;color:inherit}
   display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow);transition:transform .15s var(--ease),background .2s}
 .fab:active{transform:scale(.92)}
 .fab svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.fab.locate{margin-top:8px}
+#btnCompass{transition:opacity .2s,transform .2s var(--ease)}
+#btnCompass.gone{opacity:0;transform:scale(.6);pointer-events:none}
 .fab.primary{width:60px;height:60px;border-radius:50%;background:var(--red);color:#fff}
 .fab.primary svg{width:28px;height:28px;stroke-width:2.4}
 .fab.primary:hover{background:var(--red-dark)}
@@ -400,11 +403,11 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
     <svg viewBox="0 0 24 24" id="compassIcon"><path class="n" d="M12 3l3.5 9h-7z"/><path class="s" d="M12 21l-3.5-9h7z"/></svg></button>
   <button class="fab" id="btnLayers" title="Ebenen und Strecken" aria-label="Ebenen und Strecken">
     <svg viewBox="0 0 24 24"><path d="M12 3 2 8l10 5 10-5-10-5z"/><path d="m2 13 10 5 10-5"/></svg></button>
-  <button class="fab" id="btnLocate" title="Mein Standort" aria-label="Mein Standort">
-    <svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8z"/></svg></button>
   <button class="fab" id="btnChat" title="Chat" aria-label="Chat"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.8 7L4 20.5l1.5-4.6A8 8 0 1 1 21 12z"/></svg><span class="badge" id="chatBadge" hidden></span></button>
   <button class="fab primary" id="btnAdd" title="Objekt hinzufügen" aria-label="Objekt hinzufügen">
     <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button class="fab locate" id="btnLocate" title="Mein Standort" aria-label="Mein Standort">
+    <svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8z"/></svg></button>
 </div>
 
 <div class="banner" id="addBanner">Tippe auf die Karte, wo das Objekt steht <button id="addCancel">Abbrechen</button></div>
@@ -863,7 +866,9 @@ map.on("moveend",()=>store.set("sa_view2",{center:map.getCenter().toArray(),zoom
 
 /* Kompass dreht sich mit, Tippen richtet nach Norden aus */
 const compassIcon=$("#compassIcon");
-const updCompass=()=>compassIcon.style.transform=`rotate(${-map.getBearing()}deg)`;
+const updCompass=()=>{compassIcon.style.transform=`rotate(${-map.getBearing()}deg)`;
+  const off=Math.abs(map.getBearing())<0.5&&map.getPitch()<0.5; $("#btnCompass").classList.toggle("gone",off);};
+map.on("pitch",updCompass);
 map.on("rotate",updCompass); map.on("load",updCompass);
 $("#btnCompass").onclick=()=>map.easeTo({bearing:0,pitch:0,duration:600});
 
@@ -1913,7 +1918,7 @@ function tourSteps(){
     {title:"Objekte & Navigation", text:"Tippe kurz auf einen Pin, eine Strecke oder einen Bahnhof: Du siehst Streckennummer, ungefähren Bahnkilometer und den Knopf „Navigation starten“."+(admin?" Als Admin entfernst du Objekte, indem du den Pin lange gedrückt hältst.":" Entfernen können nur Admins. Ist etwas falsch eingetragen, sag deinem Admin Bescheid.")},
     {sel:"#btnChat", title:"Chat", text:"Schreib dem ganzen Team oder einzelnen Kollegen. Einzelnachrichten sehen nur ihr beide. Mit dem Standort-Knopf schickst du deinen Standort. Eigene Nachrichten löschst du, indem du sie antippst. Bitte keine Zugangscodes oder Passwörter in den Chat schreiben."},
     {sel:"#btnLocate", title:"Dein Standort", text:"Zeigt dich als blauen Punkt und fliegt ganz nah heran. Die Karte folgt dir, bis du sie selbst verschiebst. Einmal tippen holt dich zurück."},
-    {sel:"#btnCompass", title:"Drehen & Neigen", text:"Mit zwei Fingern drehst du die Karte, mit zwei Fingern nach oben wischen neigst du sie. Der Kompass zeigt Norden. Antippen richtet die Karte wieder gerade aus."},
+    {title:"Drehen & Neigen", text:"Mit zwei Fingern drehst du die Karte, mit zwei Fingern nach oben wischen neigst du sie. Dann erscheint rechts oben in der Knopfleiste ein Kompass. Antippen richtet die Karte wieder nach Norden aus."},
     {sel:"#btnReload", title:"Aktualisieren", text:"Tippe auf das Logo, um die App neu zu laden und die neueste Version zu holen."},
     {sel:"#userChip", title:"Dein Konto", text:(admin?"Hier schaltest du unter „Team & Rollen“ neue Kollegen frei. ":"")+"Hier kannst du dich abmelden und diese Einführung jederzeit wieder ansehen."},
     {title:"Fertig!", text:"Noch ein Tipp: Leg die App auf deinen Home-Bildschirm. Auf dem iPhone in Safari auf „Teilen“ und dann „Zum Home-Bildschirm“, auf Android im Browser-Menü „App installieren“. Dann startet sie wie eine richtige App."}
