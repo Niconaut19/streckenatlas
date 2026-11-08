@@ -294,6 +294,33 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .kmpin{width:22px;height:22px;border-radius:50%;background:var(--red);border:4px solid #fff;box-shadow:0 0 0 6px rgba(236,0,22,.25),0 2px 6px rgba(0,0,0,.4);animation:pop .3s var(--ease)}
 .x::before{content:"";position:absolute;inset:-8px}
 .row2{display:grid;grid-template-columns:1fr 2fr;gap:10px}
+.fab .badge{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--red);color:#fff;font-size:11px;font-weight:800;display:grid;place-items:center;border:2px solid var(--white)}
+.fab{position:relative}
+.sheet.chat{height:82%}
+@media (min-width:760px){.sheet.chat{height:auto}}
+.chatlist{flex:1;overflow:auto;padding:4px 14px 10px;display:flex;flex-direction:column;gap:4px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.chatlist>:first-child{margin-top:auto}
+.chatday{flex:none;align-self:center;font-size:12px;font-weight:700;color:var(--muted);margin:10px 0 4px}
+.msg{flex:none;width:fit-content;max-width:82%;align-self:flex-start;background:var(--grey-1);color:var(--ink);border-radius:16px 16px 16px 5px;padding:7px 12px 6px;overflow-wrap:break-word;word-break:break-word;position:relative}
+.msg.mine{align-self:flex-end;background:var(--red);color:#fff;border-radius:16px 16px 5px 16px}
+.msg .who{display:block;font-size:12px;font-weight:700;color:var(--red);margin-bottom:1px}
+.msg .txt{white-space:pre-wrap;line-height:1.4}
+.msg time{display:block;text-align:right;font-size:10.5px;opacity:.65;margin-top:2px;font-variant-numeric:tabular-nums}
+.msg.first{margin-top:6px}
+.msg .locbtn{display:flex;align-items:center;gap:6px;border:0;border-radius:10px;padding:7px 10px;margin:2px 0;font-weight:700;cursor:pointer;background:rgba(0,0,0,.08);color:inherit}
+.msg.mine .locbtn{background:rgba(255,255,255,.2)}
+.msg .locbtn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.2}
+.msg .del{display:none;margin-top:6px;border:0;border-radius:8px;padding:5px 10px;font-weight:700;font-size:12px;cursor:pointer;background:rgba(0,0,0,.15);color:inherit}
+.msg.sel .del{display:inline-block}
+.chatempty{margin:auto;text-align:center;color:var(--muted);max-width:260px;padding:20px}
+.chatbar{display:flex;align-items:flex-end;gap:8px;padding:10px 12px;border-top:1px solid var(--grey-1);background:var(--white)}
+.chatbar textarea{flex:1;min-width:0;resize:none;border:1.5px solid transparent;background:var(--grey-1);border-radius:20px;padding:10px 14px;font-size:16px;line-height:1.3;max-height:120px;color:var(--ink)}
+.chatbar textarea:focus{outline:none;border-color:var(--ink);background:var(--white)}
+.chatsend,.chatloc{width:42px;height:42px;border-radius:50%;border:0;display:grid;place-items:center;cursor:pointer;flex:none}
+.chatsend{background:var(--red);color:#fff}
+.chatsend:disabled{opacity:.45}
+.chatloc{background:var(--grey-1);color:var(--ink)}
+.chatsend svg,.chatloc svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
 .toast{position:fixed;z-index:60;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);
   transform:translate(-50%,20px);opacity:0;transition:all .3s var(--ease);pointer-events:none;
   background:var(--inv-bg);color:var(--inv-fg);padding:12px 18px;border-radius:12px;font-weight:600;max-width:calc(100% - 110px);text-align:center;box-shadow:var(--shadow)}
@@ -356,6 +383,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
     <svg viewBox="0 0 24 24"><path d="M12 3 2 8l10 5 10-5-10-5z"/><path d="m2 13 10 5 10-5"/></svg></button>
   <button class="fab" id="btnLocate" title="Mein Standort" aria-label="Mein Standort">
     <svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8z"/></svg></button>
+  <button class="fab" id="btnChat" title="Team-Chat" aria-label="Team-Chat"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.8 7L4 20.5l1.5-4.6A8 8 0 1 1 21 12z"/></svg><span class="badge" id="chatBadge" hidden></span></button>
   <button class="fab primary" id="btnAdd" title="Objekt hinzufügen" aria-label="Objekt hinzufügen">
     <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
 </div>
@@ -375,6 +403,11 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
         <label><input type="radio" name="base" value="osm" id="baseOsm">Straße</label>
       </div>
     </div></details>
+    <details class="group fold" data-fold="poi"><summary><h3>Essen &amp; Einkaufen</h3><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="foldbody"><div class="list">
+      <label class="opt"><span class="tag" style="background:#fff;border:3px solid #e8590c;min-width:18px;height:18px;padding:0;border-radius:50%"></span><span class="lbl">Essen &amp; Trinken<br><small>Imbiss, Restaurant, Café, Bäcker</small></span><span class="toggle"><input type="checkbox" id="poiFood" data-poi="food"><i></i></span></label>
+      <label class="opt"><span class="tag" style="background:#fff;border:3px solid #1971c2;min-width:18px;height:18px;padding:0;border-radius:50%"></span><span class="lbl">Einkaufen<br><small>Supermarkt, Kiosk, Apotheke, Läden</small></span><span class="toggle"><input type="checkbox" id="poiShop" data-poi="shop"><i></i></span></label>
+      <label class="opt"><span class="tag" style="background:#fff;border:3px solid #2f9e44;min-width:18px;height:18px;padding:0;border-radius:50%"></span><span class="lbl">Tanken &amp; Toiletten</span><span class="toggle"><input type="checkbox" id="poiSvc" data-poi="svc"><i></i></span></label>
+    </div><p class="hint" style="margin-top:8px">Erscheint beim Hineinzoomen, etwa ab Straßen-Ebene. Daten aus OpenStreetMap, ohne Öffnungszeiten.</p></div></details>
     <details class="group fold" data-fold="pts"><summary><h3>Bahnanlagen an deinen Strecken</h3><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="foldbody"><div class="list">
       <label class="opt"><span class="tag" style="background:#fff;border:3px solid #ec0016;min-width:18px;height:18px;padding:0;border-radius:50%"></span><span class="lbl">Bahnhöfe &amp; Betriebsstellen<br><small>mit DS100-Kürzel</small></span><span class="toggle"><input type="checkbox" id="ptsBst" data-pts="bst"><i></i></span></label>
       <label class="opt"><span class="tag" style="background:#fff;border:2px solid #282d37;min-width:12px;height:12px;padding:0;border-radius:50%"></span><span class="lbl">Kilometrierung<br><small>ganze km ab Ortsebene, alle beim Hineinzoomen</small></span><span class="toggle"><input type="checkbox" id="ptsKm" data-km="1"><i></i></span></label>
@@ -437,6 +470,18 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
     </form>
   </div>
   <datalist id="kmLines"></datalist>
+</section>
+
+<!-- Team-Chat -->
+<section class="sheet chat" id="sheetChat" aria-label="Team-Chat">
+  <div class="grab"></div>
+  <header><h2>Team-Chat</h2><button class="x" data-close aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+  <div class="chatlist" id="chatList" aria-live="polite"></div>
+  <form class="chatbar" id="chatForm" autocomplete="off">
+    <button type="button" class="chatloc" id="chatLoc" title="Meinen Standort senden" aria-label="Meinen Standort senden"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></button>
+    <textarea id="chatInput" rows="1" maxlength="2000" placeholder="Nachricht an das Team" aria-label="Nachricht"></textarea>
+    <button type="submit" class="chatsend" id="chatSend" aria-label="Senden"><svg viewBox="0 0 24 24"><path d="M4 12 20 4l-4 16-4-7-8-1z"/></svg></button>
+  </form>
 </section>
 
 <!-- Konto / Team -->
@@ -650,7 +695,13 @@ function supabaseBackend(){
     async deleteMarker(id){const {error,count}=await sb.from("markers").delete({count:"exact"}).eq("id",id); if(error) throw error; if(!count) throw new Error("Keine Berechtigung");},
     async listProfiles(){const {data,error}=await sb.from("profiles").select("*").order("created_at"); if(error) throw error; return data;},
     async setRole(id,role){const {error}=await sb.from("profiles").update({role}).eq("id",id); if(error) throw error;},
-    subscribe(cb){sb.channel("markers").on("postgres_changes",{event:"*",schema:"public",table:"markers"},cb).subscribe();}
+    subscribe(cb){sb.channel("markers").on("postgres_changes",{event:"*",schema:"public",table:"markers"},cb).subscribe();},
+    async listMessages(){const {data,error}=await sb.from("messages").select("*").order("created_at",{ascending:false}).limit(200);
+      if(error) throw new Error(/messages/.test(error.message)&&/exist|schema cache/.test(error.message)?"Der Chat ist noch nicht eingerichtet (SQL in Supabase ausführen).":error.message);
+      return data.reverse();},
+    async sendMessage(m){const {error}=await sb.from("messages").insert(m); if(error) throw error;},
+    async deleteMessage(id){const {error,count}=await sb.from("messages").delete({count:"exact"}).eq("id",id); if(error) throw error; if(!count) throw new Error("Keine Berechtigung");},
+    subscribeMessages(cb){sb.channel("messages").on("postgres_changes",{event:"*",schema:"public",table:"messages"},cb).subscribe();}
   };
 }
 function demoBackend(){
@@ -676,7 +727,12 @@ function demoBackend(){
       if(!m) return; if(u.role!=="admin") throw new Error("Keine Berechtigung"); markers=markers.filter(x=>x.id!==id);save();},
     async listProfiles(){return users;},
     async setRole(id,role){users.find(u=>u.id===id).role=role;saveUsers();},
-    subscribe(){}
+    subscribe(){},
+    async listMessages(){return store.get("sa_demo_msgs",[]);},
+    async sendMessage(m){const a=store.get("sa_demo_msgs",[]);a.push({...m,id:crypto.randomUUID(),user_id:current,created_at:new Date().toISOString()});store.set("sa_demo_msgs",a.slice(-200));},
+    async deleteMessage(id){const u=users.find(x=>x.id===current);const a=store.get("sa_demo_msgs",[]);const m=a.find(x=>x.id===id);
+      if(m&&m.user_id!==current&&u.role!=="admin") throw new Error("Keine Berechtigung"); store.set("sa_demo_msgs",a.filter(x=>x.id!==id));},
+    subscribeMessages(){}
   };
 }
 const api = CONFIG.SUPABASE_URL ? supabaseBackend() : demoBackend();
@@ -707,7 +763,7 @@ ORM.forEach(o=>sources["orm-"+o.key]={type:"raster",tiles:["a","b","c"].map(s=>`
 const view = store.get("sa_view2",{center:[10.45,51.16],zoom:5.5,bearing:0,pitch:0});
 const map = new maplibregl.Map({
   container:"map",
-  style:{version:8,glyphs:"https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",sources,layers:[
+  style:{version:8,glyphs:"https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",sprite:"https://tiles.openfreemap.org/sprites/ofm_f384/ofm",sources,layers:[
     {id:"osm",type:"raster",source:"osm",layout:{visibility:"none"}},
     {id:"sat",type:"raster",source:"sat",paint:{"raster-fade-duration":200}},
     {id:"dop",type:"raster",source:"dop",minzoom:11,paint:{"raster-fade-duration":250}},
@@ -737,6 +793,24 @@ const map = new maplibregl.Map({
     {id:"km-full-label",type:"symbol",source:"km",minzoom:12.5,filter:["==",["%",["get","k"],1],0],layout:{"text-field":["concat","km ",["number-format",["get","k"],{"locale":"de-DE","min-fraction-digits":0,"max-fraction-digits":1}]],"text-font":["Open Sans Semibold"],"text-size":11.5,"text-anchor":"left","text-offset":[0.7,0],"text-optional":true},paint:{"text-color":"#282d37","text-halo-color":"#ffffff","text-halo-width":1.6}},
     {id:"km-sub",type:"circle",source:"km",minzoom:15,filter:["!=",["%",["get","k"],1],0],paint:{"circle-radius":2.5,"circle-color":"#ffffff","circle-stroke-color":"#282d37","circle-stroke-width":1.5}},
     {id:"km-sub-label",type:"symbol",source:"km",minzoom:15,filter:["!=",["%",["get","k"],1],0],layout:{"text-field":["concat","km ",["number-format",["get","k"],{"locale":"de-DE","min-fraction-digits":1,"max-fraction-digits":1}]],"text-font":["Open Sans Semibold"],"text-size":10,"text-anchor":"left","text-offset":[0.7,0],"text-optional":true},paint:{"text-color":"#282d37","text-halo-color":"#ffffff","text-halo-width":1.6}},
+    {id:"poi-food",type:"circle",source:"omt","source-layer":"poi",minzoom:15,filter:["in",["get","class"],["literal",["restaurant", "fast_food", "cafe", "bakery", "bar", "beer", "ice_cream"]]],layout:{visibility:"none"},
+      paint:{"circle-radius":["interpolate",["linear"],["zoom"],15,9,18,12],"circle-color":"#ffffff","circle-stroke-color":"#e8590c","circle-stroke-width":2.5}},
+    {id:"poi-food-icon",type:"symbol",source:"omt","source-layer":"poi",minzoom:15,filter:["in",["get","class"],["literal",["restaurant", "fast_food", "cafe", "bakery", "bar", "beer", "ice_cream"]]],
+      layout:{visibility:"none","icon-image":["get","class"],"icon-size":["interpolate",["linear"],["zoom"],15,0.8,18,1],"icon-allow-overlap":true,"icon-ignore-placement":true,
+        "text-field":["step",["zoom"],"",16.5,["coalesce",["get","name:de"],["get","name"]]],"text-font":["Open Sans Semibold"],"text-size":12,"text-anchor":"left","text-offset":[1.2,0],"text-optional":true,"text-max-width":9},
+      paint:{"text-color":"#ffffff","text-halo-color":"rgba(0,0,0,.8)","text-halo-width":1.5}},
+    {id:"poi-shop",type:"circle",source:"omt","source-layer":"poi",minzoom:15,filter:["in",["get","class"],["literal",["grocery", "shop", "alcohol_shop", "clothing_store", "pharmacy"]]],layout:{visibility:"none"},
+      paint:{"circle-radius":["interpolate",["linear"],["zoom"],15,9,18,12],"circle-color":"#ffffff","circle-stroke-color":"#1971c2","circle-stroke-width":2.5}},
+    {id:"poi-shop-icon",type:"symbol",source:"omt","source-layer":"poi",minzoom:15,filter:["in",["get","class"],["literal",["grocery", "shop", "alcohol_shop", "clothing_store", "pharmacy"]]],
+      layout:{visibility:"none","icon-image":["get","class"],"icon-size":["interpolate",["linear"],["zoom"],15,0.8,18,1],"icon-allow-overlap":true,"icon-ignore-placement":true,
+        "text-field":["step",["zoom"],"",16.5,["coalesce",["get","name:de"],["get","name"]]],"text-font":["Open Sans Semibold"],"text-size":12,"text-anchor":"left","text-offset":[1.2,0],"text-optional":true,"text-max-width":9},
+      paint:{"text-color":"#ffffff","text-halo-color":"rgba(0,0,0,.8)","text-halo-width":1.5}},
+    {id:"poi-svc",type:"circle",source:"omt","source-layer":"poi",minzoom:15,filter:["in",["get","class"],["literal",["fuel", "toilets"]]],layout:{visibility:"none"},
+      paint:{"circle-radius":["interpolate",["linear"],["zoom"],15,9,18,12],"circle-color":"#ffffff","circle-stroke-color":"#2f9e44","circle-stroke-width":2.5}},
+    {id:"poi-svc-icon",type:"symbol",source:"omt","source-layer":"poi",minzoom:15,filter:["in",["get","class"],["literal",["fuel", "toilets"]]],
+      layout:{visibility:"none","icon-image":["get","class"],"icon-size":["interpolate",["linear"],["zoom"],15,0.8,18,1],"icon-allow-overlap":true,"icon-ignore-placement":true,
+        "text-field":["step",["zoom"],"",16.5,["coalesce",["get","name:de"],["get","name"]]],"text-font":["Open Sans Semibold"],"text-size":12,"text-anchor":"left","text-offset":[1.2,0],"text-optional":true,"text-max-width":9},
+      paint:{"text-color":"#ffffff","text-halo-color":"rgba(0,0,0,.8)","text-halo-width":1.5}},
     {id:"bue",type:"circle",source:"pts",minzoom:12,filter:["==",["get","t"],"bue"],
       paint:{"circle-radius":["interpolate",["linear"],["zoom"],12,3,16,6],"circle-color":"#f39200","circle-stroke-color":"#ffffff","circle-stroke-width":1.5}},
     {id:"bst",type:"circle",source:"pts",filter:["==",["get","t"],"bst"],
@@ -891,6 +965,10 @@ function kmAt(lat,lng,l){
 }
 const fmtKm=v=>"km "+v.toLocaleString("de-DE",{minimumFractionDigits:1,maximumFractionDigits:1});
 $("#ptsBst").checked=ptsOn.bst!==false; $("#ptsBue").checked=ptsOn.bue!==false;
+const poiOn=Object.assign({food:true,shop:true,svc:true},store.get("sa_poi",{}));
+const applyPoi=()=>Object.keys(poiOn).forEach(k=>{setVis("poi-"+k,poiOn[k]);setVis("poi-"+k+"-icon",poiOn[k]);});
+document.querySelectorAll("[data-poi]").forEach(cb=>{cb.checked=poiOn[cb.dataset.poi];cb.onchange=()=>{poiOn[cb.dataset.poi]=cb.checked;store.set("sa_poi",poiOn);applyPoi();};});
+map.on("load",applyPoi);
 const kmOn=()=>store.get("sa_km",true);
 $("#ptsKm").checked=kmOn();
 const applyKmVis=()=>["km-full","km-full-label","km-sub","km-sub-label"].forEach(id=>setVis(id,kmOn()));
@@ -974,11 +1052,24 @@ $("#btnAllOff").onclick=()=>{visibleLines().forEach(l=>l.on=false);saveLineOff()
 $("#lineFilterToggle").checked=lineFilterOn; $("#lineRadius").value=lineFilterRadius;
 $("#lineFilterToggle").onchange=e=>{lineFilterOn=e.target.checked;store.set("sa_linefilter",lineFilterOn);drawMarkers();};
 $("#lineRadius").onchange=e=>{lineFilterRadius=e.target.value;store.set("sa_lineradius",lineFilterRadius);drawMarkers();};
+const POI_KIND={restaurant:"Restaurant",fast_food:"Imbiss",cafe:"Café",bakery:"Bäckerei",bar:"Bar",pub:"Kneipe",beer:"Kneipe",biergarten:"Biergarten",ice_cream:"Eisdiele",
+  supermarket:"Supermarkt",convenience:"Kiosk / Späti",kiosk:"Kiosk",grocery:"Lebensmittel",greengrocer:"Obst & Gemüse",butcher:"Metzgerei",beverages:"Getränkemarkt",alcohol_shop:"Getränkemarkt",
+  clothing_store:"Kleidung",clothes:"Kleidung",pharmacy:"Apotheke",chemist:"Drogerie",shop:"Geschäft",fuel:"Tankstelle",toilets:"Toilette"};
 const BST_KIND={station:"Bahnhof",halt:"Haltepunkt",junction:"Abzweigstelle",spur_junction:"Anschlussstelle",crossover:"Überleitstelle",service_station:"Betriebsbahnhof",yard:"Rangierbahnhof",site:"Betriebsstelle"};
 map.on("click",e=>{
   if(addMode) return;
-  const hit=map.queryRenderedFeatures([[e.point.x-12,e.point.y-12],[e.point.x+12,e.point.y+12]],{layers:["bst","bue","lines-hit"].filter(id=>map.getLayer(id))});
+  const hit=map.queryRenderedFeatures([[e.point.x-12,e.point.y-12],[e.point.x+12,e.point.y+12]],{layers:["poi-food","poi-shop","poi-svc","poi-food-icon","poi-shop-icon","poi-svc-icon","bst","bue","lines-hit"].filter(id=>map.getLayer(id)&&map.getLayoutProperty(id,"visibility")!=="none")});
   if(!hit.length) return;
+  const poi=hit.find(h=>h.layer.id.startsWith("poi-"));
+  if(poi){
+    const p=poi.properties, [lng,lat]=poi.geometry.coordinates;
+    const kind=POI_KIND[p.subclass]||POI_KIND[p.class]||"Ort";
+    const name=p["name:de"]||p.name||kind;
+    openPopup&&openPopup.remove();
+    openPopup=new maplibregl.Popup({offset:12,maxWidth:"280px"}).setLngLat([lng,lat])
+      .setHTML(`<div class="pop"><span class="t">${esc(kind)}</span><h4>${esc(name)}</h4>${navLinks({lat,lng})}<p class="meta">Aus OpenStreetMap, ohne Gewähr. Öffnungszeiten bitte vor Ort prüfen.</p></div>`).addTo(map);
+    return;
+  }
   const f=hit.find(h=>h.layer.id==="bst")||hit.find(h=>h.layer.id==="bue")||hit[0];
   const p=f.properties; let html;
   if(f.layer.id==="lines-hit"){
@@ -1003,7 +1094,7 @@ map.on("click",e=>{
   openPopup&&openPopup.remove();
   openPopup=new maplibregl.Popup({offset:10,maxWidth:"290px"}).setLngLat(f.geometry.type==="Point"?f.geometry.coordinates:e.lngLat).setHTML(html).addTo(map);
 });
-["lines-hit","bst","bue"].forEach(id=>{map.on("mouseenter",id,()=>map.getCanvas().style.cursor="pointer");map.on("mouseleave",id,()=>map.getCanvas().style.cursor=addMode?"crosshair":"");});
+["lines-hit","bst","bue","poi-food","poi-shop","poi-svc"].forEach(id=>{map.on("mouseenter",id,()=>map.getCanvas().style.cursor="pointer");map.on("mouseleave",id,()=>map.getCanvas().style.cursor=addMode?"crosshair":"");});
 
 /* ============ OBJEKTE ============ */
 let me=null, markers=[], profiles={}, mapMarkers=[];
@@ -1623,6 +1714,110 @@ function goToItem(it){
   kmPopup.on("close",()=>{kmMarker&&kmMarker.remove();kmMarker=null;});
 }
 
+/* ============ TEAM-CHAT ============ */
+let chatMsgs=[], chatOpen=false, chatReady=false;
+const readKey=()=>"sa_chat_read_"+(me?me.id:"x");
+const fmtTime=iso=>new Date(iso).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
+function dayLabel(iso){
+  const d=new Date(iso), t=new Date(), y=new Date(); y.setDate(t.getDate()-1);
+  const same=(a,b)=>a.toDateString()===b.toDateString();
+  return same(d,t)?"Heute":same(d,y)?"Gestern":d.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit",year:"numeric"});
+}
+function updateChatBadge(){
+  const last=store.get(readKey(),"");
+  const n=chatMsgs.filter(m=>m.user_id!==me?.id && (!last||m.created_at>last)).length;
+  $("#chatBadge").hidden=!n; $("#chatBadge").textContent=n>99?"99+":n;
+}
+function renderChat(){
+  const el=$("#chatList");
+  if(!chatMsgs.length){el.innerHTML='<p class="chatempty">Noch keine Nachrichten. Schreib als Erstes etwas an dein Team.</p>';return;}
+  let html="", lastDay="", lastUser="", lastT=0;
+  for(const m of chatMsgs){
+    const day=dayLabel(m.created_at); if(day!==lastDay){html+=`<div class="chatday">${esc(day)}</div>`;lastDay=day;lastUser="";}
+    const mine=m.user_id===me?.id, t=new Date(m.created_at).getTime();
+    const first=m.user_id!==lastUser||t-lastT>10*60*1000; lastUser=m.user_id; lastT=t;
+    const who=!mine&&first?`<span class="who">${esc(profiles[m.user_id]?.name||"Unbekannt")}</span>`:"";
+    const loc=m.lat!=null?`<button type="button" class="locbtn" data-lat="${m.lat}" data-lng="${m.lng}"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>Standort auf Karte zeigen</button>`:"";
+    const canDel=mine||me?.role==="admin";
+    html+=`<div class="msg${mine?" mine":""}${first?" first":""}" data-id="${esc(m.id)}">${who}${m.body?`<span class="txt">${esc(m.body)}</span>`:""}${loc}<time>${fmtTime(m.created_at)}</time>${canDel?`<button type="button" class="del" data-del="${esc(m.id)}">Nachricht löschen</button>`:""}</div>`;
+  }
+  const atBottom=el.scrollHeight-el.scrollTop-el.clientHeight<80;
+  el.innerHTML=html;
+  if(atBottom||chatOpen) el.scrollTop=el.scrollHeight;
+}
+async function loadChat(){
+  try{ chatMsgs=await api.listMessages(); chatReady=true; renderChat(); updateChatBadge(); if(chatOpen) markRead(); }
+  catch(e){ chatReady=false; $("#chatList").innerHTML=`<p class="chatempty">${esc(e.message||"Chat konnte nicht geladen werden.")}</p>`; }
+}
+function markRead(){ if(chatMsgs.length) store.set(readKey(),chatMsgs[chatMsgs.length-1].created_at); updateChatBadge(); }
+$("#btnChat").onclick=()=>{
+  if($("#sheetChat").classList.contains("open")){closeSheets();return;}
+  closeSheets(); setAddMode(false); openSheet("#sheetChat"); chatOpen=true;
+  renderChat(); markRead(); setTimeout(()=>{$("#chatList").scrollTop=$("#chatList").scrollHeight;},50);
+};
+new MutationObserver(()=>{chatOpen=$("#sheetChat").classList.contains("open");}).observe($("#sheetChat"),{attributes:true,attributeFilter:["class"]});
+const chatInput=$("#chatInput");
+const autoGrow=()=>{chatInput.style.height="auto";chatInput.style.height=Math.min(120,chatInput.scrollHeight)+"px";$("#chatSend").disabled=!chatInput.value.trim();};
+chatInput.addEventListener("input",autoGrow); autoGrow();
+chatInput.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&!/iPhone|iPad|Android/.test(navigator.userAgent)){e.preventDefault();$("#chatForm").requestSubmit();}});
+async function sendChat(m){
+  try{ await api.sendMessage(m); vibrate(10); if(api.demo) await loadChat(); }
+  catch(e){ toast("Senden fehlgeschlagen: "+(e.message||"")); throw e; }
+}
+$("#chatForm").onsubmit=async e=>{
+  e.preventDefault(); const body=chatInput.value.trim(); if(!body) return;
+  $("#chatSend").disabled=true;
+  try{ await sendChat({body}); chatInput.value=""; autoGrow(); }catch{ $("#chatSend").disabled=false; }
+};
+$("#chatLoc").onclick=()=>{
+  const send=ll=>sendChat({body:null,lat:ll[1],lng:ll[0]}).then(()=>toast("Standort gesendet")).catch(()=>{});
+  if(lastLL) return send(lastLL);
+  if(!navigator.geolocation){toast("Standort wird hier nicht unterstützt");return;}
+  toast("Standort wird ermittelt …");
+  navigator.geolocation.getCurrentPosition(p=>send([p.coords.longitude,p.coords.latitude]),()=>toast("Standort nicht verfügbar. Bitte im Browser erlauben."),{enableHighAccuracy:true,timeout:15000});
+};
+$("#chatList").addEventListener("click",async e=>{
+  const lb=e.target.closest(".locbtn");
+  if(lb){
+    const lat=+lb.dataset.lat, lng=+lb.dataset.lng; closeSheets(); setFollow(false);
+    kmPopup&&kmPopup.remove(); kmMarker&&kmMarker.remove(); openPopup&&openPopup.remove();
+    const el=document.createElement("div"); el.className="kmpin";
+    kmMarker=new maplibregl.Marker({element:el}).setLngLat([lng,lat]).addTo(map);
+    map.flyTo({center:[lng,lat],zoom:17,duration:1000,essential:true});
+    const who=lb.closest(".msg")?.classList.contains("mine")?"Dein Standort":"Standort aus dem Chat";
+    kmPopup=new maplibregl.Popup({offset:16,maxWidth:"280px"}).setLngLat([lng,lat]).setHTML(`<div class="pop"><span class="t">${who}</span>${refChips(nearLineRefs(lat,lng,200),lat,lng)}${navLinks({lat,lng})}</div>`).addTo(map);
+    kmPopup.on("close",()=>{kmMarker&&kmMarker.remove();kmMarker=null;});
+    return;
+  }
+  const db=e.target.closest("[data-del]");
+  if(db){
+    if(!db.classList.contains("armed")){db.classList.add("armed");db.textContent="Wirklich löschen?";return;}
+    try{await api.deleteMessage(db.dataset.del); chatMsgs=chatMsgs.filter(m=>m.id!==db.dataset.del); renderChat();}catch(err){toast(err.message||"Löschen fehlgeschlagen");}
+    return;
+  }
+  const msg=e.target.closest(".msg");
+  if(msg&&msg.querySelector(".del")){document.querySelectorAll(".msg.sel").forEach(x=>{if(x!==msg)x.classList.remove("sel");}); msg.classList.toggle("sel");}
+});
+/* Tastatur auf dem iPhone: Chat-Fenster über der Tastatur halten */
+if(window.visualViewport){
+  const fit=()=>{const sh=$("#sheetChat"); if(!chatOpen){sh.style.bottom="";return;}
+    const kb=Math.max(0,window.innerHeight-visualViewport.height-visualViewport.offsetTop);
+    sh.style.bottom=kb?kb+"px":""; sh.style.maxHeight=kb?(visualViewport.height-20)+"px":"";
+    if(kb) $("#chatList").scrollTop=$("#chatList").scrollHeight;};
+  visualViewport.addEventListener("resize",fit); visualViewport.addEventListener("scroll",fit);
+}
+function onChatChange(payload){
+  if(payload.eventType==="INSERT"){
+    const m=payload.new; if(chatMsgs.some(x=>x.id===m.id)) return;
+    chatMsgs.push(m); if(chatMsgs.length>300) chatMsgs.shift();
+    renderChat();
+    if(chatOpen) markRead();
+    else { updateChatBadge(); if(m.user_id!==me?.id){ toast(`Neue Nachricht von ${profiles[m.user_id]?.name||"Kollege"}`); vibrate([30,40,30]); } }
+  } else if(payload.eventType==="DELETE"){
+    chatMsgs=chatMsgs.filter(x=>x.id!==payload.old?.id); renderChat(); updateChatBadge();
+  }
+}
+
 /* ============ EINFÜHRUNG für neue Nutzer ============ */
 function tourSteps(){
   const admin=me&&me.role==="admin";
@@ -1632,6 +1827,7 @@ function tourSteps(){
     {sel:"#btnLayers", title:"Karte & Strecken", text:"Hier wählst du die Kartenansicht und schaltest einzelne Strecken an oder aus. Tipp: Erst „Alle aus“, dann deine Streckennummer suchen und einschalten. Bahnhöfe, Bahnübergänge und Kilometer siehst du dann nur an deinen Strecken."},
     {sel:"#btnAdd", title:"Objekt hinzufügen", text:"Tippe auf das Plus und dann auf die Stelle in der Karte, wo z. B. ein ESTW steht. Art wählen, Bezeichnung eingeben, speichern und mit „Ja, hinzufügen“ bestätigen. Danach sehen es alle Kollegen."},
     {title:"Objekte & Navigation", text:"Tippe kurz auf einen Pin, eine Strecke oder einen Bahnhof: Du siehst Streckennummer, ungefähren Bahnkilometer und den Knopf „Navigation starten“."+(admin?" Als Admin entfernst du Objekte, indem du den Pin lange gedrückt hältst.":" Entfernen können nur Admins. Ist etwas falsch eingetragen, sag deinem Admin Bescheid.")},
+    {sel:"#btnChat", title:"Team-Chat", text:"Hier schreibst du mit allen freigeschalteten Kolleginnen und Kollegen. Mit dem Standort-Knopf schickst du deinen Standort, den die anderen direkt auf der Karte öffnen können. Bitte keine Zugangscodes oder Passwörter in den Chat schreiben."},
     {sel:"#btnLocate", title:"Dein Standort", text:"Zeigt dich als blauen Punkt und fliegt ganz nah heran. Die Karte folgt dir, bis du sie selbst verschiebst. Einmal tippen holt dich zurück."},
     {sel:"#btnCompass", title:"Drehen & Neigen", text:"Mit zwei Fingern drehst du die Karte, mit zwei Fingern nach oben wischen neigst du sie. Der Kompass zeigt Norden. Antippen richtet die Karte wieder gerade aus."},
     {sel:"#btnReload", title:"Aktualisieren", text:"Tippe auf das Logo, um die App neu zu laden und die neueste Version zu holen."},
@@ -1747,7 +1943,8 @@ async function start(){
   $("#userName").textContent=me.name; $("#userAvatar").textContent=(me.name||"?")[0].toUpperCase();
   $("#userRole").textContent=me.role==="admin"?"Admin":"Mitarbeiter"; $("#userRole").className=me.role==="admin"?"admin":"";
   await refreshMarkers();
-  if(!subscribed){api.subscribe(()=>refreshMarkers());subscribed=true;}
+  if(!subscribed){api.subscribe(()=>refreshMarkers());api.subscribeMessages(onChatChange);subscribed=true;}
+  loadChat();
   if(api.demo && !store.get("sa_demo_seen",false)){store.set("sa_demo_seen",true);toast("Demo-Modus: Daten bleiben nur auf diesem Gerät");}
   if(!store.get(tourKey(),false)) setTimeout(startTour,700);
   if(nb.on) startWatch(false);

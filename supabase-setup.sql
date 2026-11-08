@@ -66,3 +66,20 @@ alter publication supabase_realtime add table public.markers;
 alter table public.markers add column if not exists updated_at timestamptz;
 alter table public.markers add column if not exists updated_by uuid references public.profiles(id) on delete set null;
 create policy "Objekte bearbeiten" on public.markers for update to authenticated using (is_admin()) with check (is_admin());
+
+-- Team-Chat: nur freigeschaltete Mitarbeiter lesen und schreiben,
+-- löschen darf man eigene Nachrichten, Admins alle
+create table if not exists public.messages (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  body text check (char_length(body) between 1 and 2000),
+  lat double precision,
+  lng double precision,
+  created_at timestamptz not null default now(),
+  check (body is not null or (lat is not null and lng is not null))
+);
+alter table public.messages enable row level security;
+create policy "Chat lesen"     on public.messages for select to authenticated using (is_member());
+create policy "Chat schreiben" on public.messages for insert to authenticated with check (is_member() and user_id = auth.uid());
+create policy "Chat löschen"   on public.messages for delete to authenticated using (user_id = auth.uid() or is_admin());
+alter publication supabase_realtime add table public.messages;
