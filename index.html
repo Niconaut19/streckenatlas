@@ -596,7 +596,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
       <div class="list">
         <label class="opt"><span class="lbl">Banner bei neuen Nachrichten<br><small>Oben auf dem Bildschirm, wie bei WhatsApp</small></span><span class="toggle"><input type="checkbox" id="cnBanner"><i></i></span></label>
         <label class="opt"><span class="lbl">Ton bei neuen Nachrichten<br><small>Solange die App geöffnet ist</small></span><span class="toggle"><input type="checkbox" id="cnSound"><i></i></span></label>
-        <button type="button" class="opt setrow" id="cnTest"><span class="lbl">Ton testen</span><svg class="rchev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>
+        <label class="opt"><span class="lbl">Ton<br><small>Beim Auswählen hörst du ihn</small></span><select id="cnTone" class="minisel"></select></label>
         <label class="opt" id="cnSysRow"><span class="lbl">Auch als Mitteilung des Handys<br><small>Wenn die App im Hintergrund noch offen ist</small></span><span class="toggle"><input type="checkbox" id="cnSys"><i></i></span></label>
       </div>
     </div>
@@ -803,20 +803,31 @@ function unlockAudio(){
   }catch{}
 }
 ["pointerdown","touchend","keydown"].forEach(t=>document.addEventListener(t,unlockAudio,{passive:true}));
+/* Eigene Töne (selbst erzeugt). Jede Note: [Frequenz, Start, Dauer, Lautstärke, Wellenform] */
+const TONES={
+  ding:   {label:"Ding",       notes:[[880,0,.14,.22,"sine"],[1319,.11,.26,.22,"sine"]]},
+  notiz:  {label:"Hinweis",    notes:[[1568,0,.09,.16,"triangle"],[1175,.08,.09,.16,"triangle"],[1568,.16,.22,.16,"triangle"]]},
+  glocke: {label:"Glocke",     notes:[[1047,0,1.1,.18,"sine"],[2094,0,.6,.06,"sine"],[3140,0,.3,.03,"sine"]]},
+  tropfen:{label:"Tropfen",    notes:[[1400,0,.12,.22,"sine",700]]},
+  dreik:  {label:"Dreiklang",  notes:[[784,0,.12,.18,"sine"],[988,.09,.12,.18,"sine"],[1175,.18,.3,.18,"sine"]]},
+  kurz:   {label:"Kurz & leise",notes:[[988,0,.09,.12,"sine"]]}
+};
 function playTone(kind){
   try{
     if(!audioCtx||audioCtx.state!=="running") return false;
-    const t0=audioCtx.currentTime, notes=kind==="soft"?[[988,0,.09]]:[[880,0,.12],[1319,.11,.22]];
-    const vol=kind==="soft"?0.12:0.22;
-    for(const [f,start,len] of notes){
+    const name=kind==="soft"?"kurz":(kind||((typeof cn!=="undefined"&&cn.tone)||"ding"));
+    const t=TONES[name]||TONES.ding, t0=audioCtx.currentTime;
+    for(const [f,start,len,vol,wave,fEnd] of t.notes){
       const o=audioCtx.createOscillator(), g=audioCtx.createGain();
-      o.type="sine"; o.frequency.value=f;
-      g.gain.setValueAtTime(0,t0+start); g.gain.linearRampToValueAtTime(vol,t0+start+0.012); g.gain.exponentialRampToValueAtTime(0.0001,t0+start+len);
+      o.type=wave||"sine"; o.frequency.setValueAtTime(f,t0+start);
+      if(fEnd) o.frequency.exponentialRampToValueAtTime(fEnd,t0+start+len);
+      g.gain.setValueAtTime(0,t0+start); g.gain.linearRampToValueAtTime(vol,t0+start+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t0+start+len);
       o.connect(g); g.connect(audioCtx.destination); o.start(t0+start); o.stop(t0+start+len+0.02);
     }
     return true;
   }catch{ return false; }
 }
+
 
 /* ============ BACKEND: Supabase oder Demo ============ */
 function supabaseBackend(){
@@ -2138,9 +2149,11 @@ function onChatChange(payload){
 }
 
 /* ============ NACHRICHTEN-BANNER (wie bei WhatsApp) ============ */
-const cn=Object.assign({banner:true,sys:false,sound:true},store.get("sa_chatnotify",{}));
+const cn=Object.assign({banner:true,sys:false,sound:true,tone:"ding"},store.get("sa_chatnotify",{}));
 $("#cnSound").checked=cn.sound; $("#cnSound").onchange=e=>{cn.sound=e.target.checked;store.set("sa_chatnotify",cn); if(cn.sound) playTone();};
-$("#cnTest").onclick=()=>{ unlockAudio(); setTimeout(()=>{ if(!playTone()) toast("Ton konnte nicht abgespielt werden. Ist das Handy laut gestellt?"); },60); };
+$("#cnTone").innerHTML=Object.entries(TONES).filter(([k])=>k!=="kurz").map(([k,t])=>`<option value="${k}">${t.label}</option>`).join("");
+$("#cnTone").value=cn.tone||"ding";
+$("#cnTone").onchange=e=>{ cn.tone=e.target.value; store.set("sa_chatnotify",cn); unlockAudio(); setTimeout(()=>{ if(!playTone(cn.tone)) toast("Ton konnte nicht abgespielt werden. Ist das Handy laut gestellt?"); },60); };
 $("#cnBanner").checked=cn.banner; $("#cnSys").checked=cn.sys; $("#cnSysRow").hidden=!("Notification" in window);
 $("#cnBanner").onchange=e=>{cn.banner=e.target.checked;store.set("sa_chatnotify",cn);};
 $("#cnSys").onchange=async e=>{
