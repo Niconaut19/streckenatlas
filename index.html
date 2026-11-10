@@ -373,6 +373,19 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .setrow{width:100%;border:0;border-top:1px solid var(--grey-1);background:var(--white);text-align:left;font:inherit;color:var(--ink);cursor:pointer}
 .setrow:first-child{border-top:0}
 .setrow .rchev,.rchev{width:18px;height:18px;stroke:var(--muted);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.msgbanner{position:fixed;z-index:66;left:max(8px,env(safe-area-inset-left,0px));right:max(8px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 8px);
+  max-width:520px;margin:0 auto;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:18px;cursor:pointer;
+  background:color-mix(in srgb,var(--white) 94%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  box-shadow:0 8px 30px rgba(0,0,0,.25);animation:mbin .35s var(--ease);touch-action:none}
+@keyframes mbin{from{transform:translateY(-120%)}}
+.msgbanner.out{transform:translateY(-130%);transition:transform .3s var(--ease)}
+.msgbanner .avatar{width:42px;height:42px;font-size:17px;background:var(--red);color:#fff;flex:none}
+.msgbanner .avatar svg{width:22px;height:22px;stroke:#fff;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.mbtext{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.mbhead{display:flex;align-items:baseline;gap:8px}
+.mbhead b{flex:1;min-width:0;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mbhead time{font-size:12px;color:var(--muted);flex:none}
+#mbBody{font-size:14px;color:var(--ink-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
 .toast{position:fixed;z-index:60;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);
   transform:translate(-50%,20px);opacity:0;transition:all .3s var(--ease);pointer-events:none;
   background:var(--inv-bg);color:var(--inv-fg);padding:12px 18px;border-radius:12px;font-weight:600;max-width:calc(100% - 110px);text-align:center;box-shadow:var(--shadow)}
@@ -579,6 +592,12 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
       <p class="hint" id="offInfo"></p>
       <button class="linkbtn" type="button" id="offClear" hidden>Gespeicherte Karten löschen</button>
     </div></details>
+    <div class="group"><h3>Chat</h3>
+      <div class="list">
+        <label class="opt"><span class="lbl">Banner bei neuen Nachrichten<br><small>Oben auf dem Bildschirm, wie bei WhatsApp</small></span><span class="toggle"><input type="checkbox" id="cnBanner"><i></i></span></label>
+        <label class="opt" id="cnSysRow"><span class="lbl">Auch als Mitteilung des Handys<br><small>Wenn die App im Hintergrund noch offen ist</small></span><span class="toggle"><input type="checkbox" id="cnSys"><i></i></span></label>
+      </div>
+    </div>
     <div class="group"><h3>Hilfe</h3>
       <div class="list">
         <button type="button" class="opt setrow" id="btnTour"><span class="lbl">Einführung ansehen</span><svg class="rchev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>
@@ -734,6 +753,11 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 <button class="updbar" id="updBar" hidden type="button">Neue Version verfügbar · <b>Jetzt aktualisieren</b></button>
 
 <div class="offpill" id="offPill" hidden><span class="dot"></span><span id="offPillTxt">Offline</span></div>
+
+<div class="msgbanner" id="msgBanner" hidden role="status" aria-live="polite">
+  <span class="avatar" id="mbAvatar"></span>
+  <div class="mbtext"><div class="mbhead"><b id="mbWho"></b><time id="mbTime"></time></div><span id="mbBody"></span></div>
+</div>
 
 <div class="toast" id="toast"></div>
 
@@ -1987,7 +2011,7 @@ async function loadChat(){
     if(changed&&chatOpen){ chatConv?(renderChat(),markRead(chatConv)):renderConvs(); }
     if(!first&&isNew.length&&!(chatOpen&&chatConv&&isNew.every(m=>convOf(m)===chatConv))){
       const m=isNew[isNew.length-1], c=convOf(m);
-      toast(c===TEAM?`Neue Nachricht im Team von ${nameOf(m.user_id)}`:`${nameOf(m.user_id)} schreibt dir`); vibrate([30,40,30]);
+      showChatBanner(m, isNew.length);
     }
   }
   catch(e){ $("#convHint").textContent=e.message||"Chat konnte nicht geladen werden."; }
@@ -2079,12 +2103,57 @@ function onChatChange(payload){
     const c=convOf(m);
     if(chatOpen&&chatConv===c){ renderChat(); markRead(c); }   // markRead prüft, ob die App sichtbar ist
     else { updateChatBadge(); if(chatOpen&&!chatConv) renderConvs();
-      if(m.user_id!==me?.id){ toast(c===TEAM?`Neue Nachricht im Team von ${nameOf(m.user_id)}`:`${nameOf(m.user_id)} schreibt dir`); vibrate([30,40,30]); } }
+      if(m.user_id!==me?.id) showChatBanner(m); }
   } else if(payload.eventType==="DELETE"){
     chatMsgs=chatMsgs.filter(x=>x.id!==payload.old?.id); updateChatBadge();
     if(chatOpen) chatConv?renderChat():renderConvs();
   }
 }
+
+/* ============ NACHRICHTEN-BANNER (wie bei WhatsApp) ============ */
+const cn=Object.assign({banner:true,sys:false},store.get("sa_chatnotify",{}));
+$("#cnBanner").checked=cn.banner; $("#cnSys").checked=cn.sys; $("#cnSysRow").hidden=!("Notification" in window);
+$("#cnBanner").onchange=e=>{cn.banner=e.target.checked;store.set("sa_chatnotify",cn);};
+$("#cnSys").onchange=async e=>{
+  cn.sys=e.target.checked;
+  if(cn.sys&&Notification.permission!=="granted"){
+    try{ if((await Notification.requestPermission())!=="granted"){cn.sys=false;e.target.checked=false;toast("Mitteilungen wurden nicht erlaubt");} }
+    catch{cn.sys=false;e.target.checked=false;toast("Mitteilungen werden hier nicht unterstützt");}
+  }
+  store.set("sa_chatnotify",cn);
+};
+let mbTimer=null, mbConv=null, mbCount=0;
+function showChatBanner(m,count){
+  const c=convOf(m), name=nameOf(m.user_id), text=m.body||"hat einen Standort geteilt";
+  vibrate([30,40,30]);
+  if(document.visibilityState!=="visible"){
+    if(cn.sys&&"Notification" in window&&Notification.permission==="granted"){
+      const title=c===TEAM?`${name} · Team`:name;
+      try{ swReg?swReg.showNotification(title,{body:text,tag:"chat-"+c,renotify:true,icon:"icons/icon-192.png",data:{conv:c}}):new Notification(title,{body:text,tag:"chat-"+c}); }catch{}
+    }
+    return;
+  }
+  if(!cn.banner){ toast(c===TEAM?`Neue Nachricht im Team von ${name}`:`${name} schreibt dir`); return; }
+  const el=$("#msgBanner");
+  mbCount = (!el.hidden&&mbConv===c) ? mbCount+1 : 1; mbConv=c;
+  $("#mbAvatar").innerHTML = c===TEAM?TEAM_SVG:esc((name||"?")[0].toUpperCase());
+  $("#mbWho").textContent = c===TEAM?`${name} · Team`:name;
+  $("#mbTime").textContent = mbCount>1?`${mbCount} neue`:"jetzt";
+  $("#mbBody").textContent = text;
+  el.classList.remove("out"); el.style.transform=""; el.hidden=false;
+  el.style.animation="none"; void el.offsetWidth; el.style.animation="";
+  clearTimeout(mbTimer); mbTimer=setTimeout(hideChatBanner,6000);
+}
+function hideChatBanner(){ const el=$("#msgBanner"); if(el.hidden) return; el.classList.add("out"); setTimeout(()=>{el.hidden=true;el.classList.remove("out");el.style.transform="";},300); }
+function openChatTo(c){ closeSheets(); setAddMode(false); openSheet("#sheetChat"); chatOpen=true; selMsg=null; openConv(c); }
+(function(){
+  const el=$("#msgBanner"); let y0=null, dy=0;
+  el.addEventListener("touchstart",e=>{y0=e.touches[0].clientY;dy=0;clearTimeout(mbTimer);},{passive:true});
+  el.addEventListener("touchmove",e=>{ if(y0==null) return; dy=Math.min(0,e.touches[0].clientY-y0); el.style.transform=`translateY(${dy}px)`; },{passive:true});
+  el.addEventListener("touchend",()=>{ if(dy<-30){ hideChatBanner(); } else { el.style.transform=""; mbTimer=setTimeout(hideChatBanner,4000); } y0=null; });
+  el.addEventListener("click",()=>{ if(dy<-30) return; const c=mbConv; el.hidden=true; if(c) openChatTo(c); });
+})();
+if("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message",e=>{ if(e.data&&e.data.openChat) openChatTo(e.data.openChat); });
 
 /* ============ LIVE-ABGLEICH ============
    Die Live-Verbindung bricht auf dem Handy ab, wenn der Bildschirm aus ist oder die App im Hintergrund läuft.

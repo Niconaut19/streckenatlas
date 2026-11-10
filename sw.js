@@ -115,8 +115,9 @@ self.addEventListener("fetch", e => {
 self.addEventListener("notificationclick", e => {
   e.notification.close();
   e.waitUntil((async () => {
+    const conv = e.notification.data && e.notification.data.conv;
     const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-    for (const c of all) { if ("focus" in c) return c.focus(); }
+    for (const c of all) { if ("focus" in c) { await c.focus(); if (conv) c.postMessage({ openChat: conv }); return; } }
     return self.clients.openWindow("./");
   })());
 });
