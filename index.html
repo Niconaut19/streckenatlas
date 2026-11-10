@@ -357,6 +357,11 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .chatsend svg,.chatloc svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
 .updbar{position:fixed;z-index:65;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 64px);border:0;cursor:pointer;
   background:var(--red);color:#fff;font:600 14px var(--sans);padding:10px 16px;border-radius:999px;box-shadow:var(--shadow);white-space:nowrap;animation:slidein .35s var(--ease)}
+.offpill{position:fixed;z-index:21;left:max(10px,env(safe-area-inset-left,0px));top:calc(env(safe-area-inset-top,0px) + 64px);
+  display:flex;align-items:center;gap:7px;background:var(--inv-bg);color:var(--inv-fg);font-size:12.5px;font-weight:700;padding:6px 12px;border-radius:999px;box-shadow:var(--shadow)}
+.offpill .dot{width:8px;height:8px;border-radius:50%;background:#f59f00}
+.offbar{height:8px;border-radius:4px;background:var(--grey-1);overflow:hidden}
+.offbar i{display:block;height:100%;width:0;background:var(--red);transition:width .3s}
 .toast{position:fixed;z-index:60;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);
   transform:translate(-50%,20px);opacity:0;transition:all .3s var(--ease);pointer-events:none;
   background:var(--inv-bg);color:var(--inv-fg);padding:12px 18px;border-radius:12px;font-weight:600;max-width:calc(100% - 110px);text-align:center;box-shadow:var(--shadow)}
@@ -438,6 +443,18 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
         <label><input type="radio" name="base" value="satlab" id="baseSatLab">Hybrid</label>
         <label><input type="radio" name="base" value="osm" id="baseOsm">Straße</label>
       </div>
+    </div></details>
+    <details class="group fold" data-fold="offline"><summary><h3>Offline-Karten</h3><span class="sumnote" id="offSum"></span><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="foldbody stack">
+      <p class="hint">Speichert Luftbild sowie Straßen und Ortsnamen auf dem Handy, damit du sie ohne Netz siehst. Strecken, Bahnhöfe, Bahnübergänge, Kilometer und eure Objekte sind offline sowieso dabei.</p>
+      <button class="btn primary block" type="button" id="offLines">Meine Strecken speichern</button>
+      <button class="btn block" type="button" id="offView">Aktuellen Kartenausschnitt speichern</button>
+      <div id="offProg" class="stack" hidden>
+        <div class="offbar"><i id="offBar"></i></div>
+        <p class="hint" id="offTxt"></p>
+        <button class="btn small" type="button" id="offStop">Abbrechen</button>
+      </div>
+      <p class="hint" id="offInfo"></p>
+      <button class="linkbtn" type="button" id="offClear" hidden>Gespeicherte Karten löschen</button>
     </div></details>
     <details class="group fold" data-fold="poi"><summary><h3>Essen &amp; Einkaufen</h3><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="foldbody"><div class="list">
       <label class="opt"><span class="tag" style="background:#fff;border:3px solid #e8590c;min-width:18px;height:18px;padding:0;border-radius:50%"></span><span class="lbl">Essen &amp; Trinken<br><small>Imbiss, Restaurant, Café, Bäcker</small></span><span class="toggle"><input type="checkbox" id="poiFood" data-poi="food"><i></i></span></label>
@@ -634,6 +651,15 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
   </div>
 </div>
 
+<div class="modal" id="askModal" hidden role="dialog" aria-modal="true" aria-labelledby="askHead">
+  <div class="card">
+    <h2 id="askHead"></h2>
+    <p class="hint" id="askText"></p>
+    <button class="btn primary block" id="askYes"></button>
+    <button class="btn block" id="askNo">Abbrechen</button>
+  </div>
+</div>
+
 <div class="modal" id="confirmDel" hidden role="dialog" aria-modal="true" aria-labelledby="dHead">
   <div class="card">
     <h2 id="dHead">Objekt entfernen?</h2>
@@ -679,6 +705,8 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 
 <button class="updbar" id="updBar" hidden type="button">Neue Version verfügbar · <b>Jetzt aktualisieren</b></button>
 
+<div class="offpill" id="offPill" hidden><span class="dot"></span><span id="offPillTxt">Offline</span></div>
+
 <div class="toast" id="toast"></div>
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
@@ -715,10 +743,15 @@ const vibrate = ms => { try{navigator.vibrate&&navigator.vibrate(ms)}catch{} };
 function supabaseBackend(){
   const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
   async function me(){
-    const {data:{session}} = await sb.auth.getSession();
-    if(!session) return null;
-    const {data} = await sb.from("profiles").select("*").eq("id",session.user.id).maybeSingle();
-    return data ? {id:data.id,name:data.name||data.email,email:data.email,role:data.role} : {id:session.user.id,name:session.user.email,role:"wartend"};
+    const cached=store.get("sa_me_cache",null);
+    let session=null;
+    try{ ({data:{session}} = await sb.auth.getSession()); }catch{}
+    if(!session){ return (cached&&!navigator.onLine)?{...cached,offline:true}:null; }
+    const {data,error} = await sb.from("profiles").select("*").eq("id",session.user.id).maybeSingle();
+    if(error&&cached&&cached.id===session.user.id) return {...cached,offline:true};   // kein Netz: letzter bekannter Stand
+    const m = data ? {id:data.id,name:data.name||data.email,email:data.email,role:data.role} : {id:session.user.id,name:session.user.email,role:"wartend"};
+    if(data) store.set("sa_me_cache",m);
+    return m;
   }
   return {
     demo:false, me,
@@ -1279,8 +1312,15 @@ function drawMarkers(){
 let markersSig="";
 async function refreshMarkers(quiet){
   try{
-    const ms = await api.listMarkers();
-    const ps = await api.listProfiles(); profiles = Object.fromEntries(ps.map(p=>[p.id,p]));
+    let ms, ps;
+    try{
+      ms = await api.listMarkers(); ps = await api.listProfiles();
+      store.set("sa_cache_data",{markers:ms,profiles:ps,at:new Date().toISOString()}); setOffline(false);
+    }catch(err){
+      const c=store.get("sa_cache_data",null); if(!c) throw err;
+      ms=c.markers; ps=c.profiles; setOffline(true,c.at); quiet=true;
+    }
+    profiles = Object.fromEntries(ps.map(p=>[p.id,p]));
     const sig=ms.map(m=>m.id+":"+(m.updated_at||"")+":"+m.lat+":"+m.lng).join("|");
     markers=ms;
     if(sig!==markersSig||!quiet){ markersSig=sig; drawMarkers(); }   // nur neu zeichnen, wenn sich etwas geändert hat
@@ -1594,7 +1634,7 @@ $("#resetForm").onsubmit=async e=>{
   catch(e2){err.textContent=e2.message;}
   finally{btn.disabled=false;}
 };
-async function logout(){await api.signOut();me=null;markers=[];mapMarkers.forEach(m=>m.remove());mapMarkers=[];closeSheets();await start();}
+async function logout(){["sa_me_cache","sa_cache_data","sa_cache_chat"].forEach(k=>{try{localStorage.removeItem(k)}catch{}});await api.signOut();me=null;markers=[];mapMarkers.forEach(m=>m.remove());mapMarkers=[];closeSheets();await start();}
 $("#btnLogout").onclick=logout; $("#btnLogout2").onclick=logout; $("#btnRecheck").onclick=()=>start();
 
 let subscribed=false;
@@ -1900,7 +1940,9 @@ function renderChat(){
 let chatSig="";
 async function loadChat(){
   try{
-    const fresh=(await api.listMessages()).filter(visible);
+    let fresh;
+    try{ fresh=(await api.listMessages()).filter(visible); store.set("sa_cache_chat",fresh.slice(-300)); }
+    catch(err){ if(chatMsgs.length) return; fresh=store.get("sa_cache_chat",[]); if(!fresh.length) throw err; }
     const sig=fresh.map(m=>m.id).join("|");
     const pending=chatMsgs.filter(m=>m._pending);
     const isNew=fresh.filter(m=>m.user_id!==me?.id&&!chatMsgs.some(x=>x.id===m.id));
@@ -2021,6 +2063,139 @@ document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==
 window.addEventListener("online",syncNow);
 window.addEventListener("pageshow",e=>{ if(e.persisted) syncNow(); });
 setInterval(()=>{ if(document.visibilityState==="visible"&&Date.now()-lastSync>12000) syncNow(); },15000);
+
+/* ============ OFFLINE ============ */
+function ask(title,text,yes){
+  return new Promise(res=>{
+    $("#askHead").textContent=title; $("#askText").textContent=text; $("#askYes").textContent=yes; $("#askModal").hidden=false;
+    const done=v=>{$("#askModal").hidden=true;$("#askYes").onclick=$("#askNo").onclick=null;res(v);};
+    $("#askYes").onclick=()=>done(true); $("#askNo").onclick=()=>done(false);
+  });
+}
+let isOffline=false;
+function setOffline(on,at){
+  isOffline=on||!navigator.onLine;
+  $("#offPill").hidden=!isOffline;
+  if(isOffline) $("#offPillTxt").textContent=at?`Offline · Stand ${new Date(at).toLocaleString("de-DE",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}`:"Offline · gespeicherte Daten";
+  setDopMax(isOffline?17:20);
+}
+window.addEventListener("offline",()=>setOffline(true,store.get("sa_cache_data",{}).at));
+window.addEventListener("online",()=>setOffline(false));
+/* Ohne Netz: Luftbild höchstens bis Stufe 17 laden und darüber vergrößern, weil nur bis dahin gespeichert wird */
+let dopMax=20;
+function setDopMax(n){
+  if(n===dopMax||!map.getSource||!map.getSource("dop")) return; dopMax=n;
+  const vis=map.getLayoutProperty("dop","visibility");
+  map.removeLayer("dop"); map.removeSource("dop");
+  map.addSource("dop",{...sources.dop,maxzoom:n});
+  map.addLayer({id:"dop",type:"raster",source:"dop",minzoom:11,layout:{visibility:vis||"visible"},paint:{"raster-fade-duration":250}},"labels");
+}
+map.on("load",()=>{ if(!navigator.onLine) setOffline(true,store.get("sa_cache_data",{}).at); });
+
+/* Kartenteile berechnen */
+const RM=20037508.342789244, SAVED_CACHE="sa-tiles-saved";
+const lon2x=(lon,z)=>Math.floor((lon+180)/360*2**z);
+const lat2y=(lat,z)=>{const r=lat*Math.PI/180;return Math.floor((1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*2**z);};
+const tileM=(lat,z)=>40075016.686*Math.cos(lat*Math.PI/180)/2**z;
+const BY=[8.9,47.2,13.9,50.6];
+function tilesAlong(coordsList,z,halfW){
+  const set=new Set();
+  for(const seg of coordsList){
+    for(let i=0;i<seg.length;i++){
+      const a=seg[i], b=seg[i+1]||a, lat=a[1], tm=tileM(lat,z), r=Math.max(1,Math.round(halfW/tm));
+      const steps=Math.max(1,Math.ceil(distM(a,b)/(tm/2)));
+      for(let k=0;k<steps;k++){
+        const lon=a[0]+(b[0]-a[0])*k/steps, la=a[1]+(b[1]-a[1])*k/steps;
+        const x=lon2x(lon,z), y=lat2y(la,z);
+        for(let dx=-r;dx<=r;dx++) for(let dy=-r;dy<=r;dy++) set.add(z+"/"+(x+dx)+"/"+(y+dy));
+      }
+    }
+  }
+  return set;
+}
+function tilesInBounds(b,z){
+  const set=new Set(), x0=lon2x(b.getWest(),z), x1=lon2x(b.getEast(),z), y0=lat2y(b.getNorth(),z), y1=lat2y(b.getSouth(),z);
+  for(let x=x0;x<=x1;x++) for(let y=y0;y<=y1;y++) set.add(z+"/"+x+"/"+y);
+  return set;
+}
+const inBY=(z,x,y)=>{const n=2**z, lon=x/n*360-180, lat=Math.atan(Math.sinh(Math.PI*(1-2*(y+.5)/n)))*180/Math.PI; return lon>=BY[0]-.1&&lon<=BY[2]+.1&&lat>=BY[1]-.1&&lat<=BY[3]+.1;};
+function dopUrl(z,x,y){const w=2*RM/2**z, minx=-RM+x*w, maxy=RM-y*w; return sources.dop.tiles[0].replace("{bbox-epsg-3857}",`${minx},${maxy-w},${minx+w},${maxy}`);}
+const dopKey=(z,x,y)=>`https://tilecache.streckenatlas/dop/${z}/${x}/${y}`;
+const omtKey=(z,x,y)=>`https://tilecache.streckenatlas/omt/${z}/${x}/${y}`;
+async function omtTemplate(){ const r=await fetch("https://tiles.openfreemap.org/planet"); const j=await r.json(); return j.tiles[0]; }
+
+async function buildJob(mode){
+  const jobs=[];
+  if(mode==="lines"){
+    const ls=[...lines.values()].filter(l=>l.on);
+    if(!ls.length) throw new Error("Schalte zuerst unter „Strecken in Bayern“ die Strecken ein, die du offline brauchst.");
+    if(ls.length===lines.size) throw new Error("Es sind alle Strecken eingeschaltet. Das wäre zu viel für das Handy. Schalte bitte nur deine Strecken ein.");
+    const cl=ls.flatMap(l=>l.feature.geometry.coordinates);
+    for(const [z,hw] of [[12,1200],[13,900],[14,700],[15,600],[16,450],[17,250]])
+      tilesAlong(cl,z,hw).forEach(t=>{const [zz,x,y]=t.split("/").map(Number); if(inBY(zz,x,y)) jobs.push({kind:"dop",z:zz,x,y});});
+    for(const [z,hw] of [[10,3000],[11,2500],[12,2000],[13,1500],[14,1200]])
+      tilesAlong(cl,z,hw).forEach(t=>{const [zz,x,y]=t.split("/").map(Number); jobs.push({kind:"omt",z:zz,x,y});});
+  } else {
+    const z0=Math.floor(map.getZoom());
+    if(z0<12) throw new Error("Bitte näher heranzoomen, etwa auf einen Ort oder Stadtteil.");
+    const b=map.getBounds();
+    for(let z=Math.max(11,z0-2);z<=Math.min(17,z0+3);z++) tilesInBounds(b,z).forEach(t=>{const [zz,x,y]=t.split("/").map(Number); if(inBY(zz,x,y)) jobs.push({kind:"dop",z:zz,x,y});});
+    for(let z=Math.max(10,z0-3);z<=14;z++) tilesInBounds(b,z).forEach(t=>{const [zz,x,y]=t.split("/").map(Number); jobs.push({kind:"omt",z:zz,x,y});});
+  }
+  return jobs;
+}
+let offAbort=null;
+async function runOffline(mode){
+  if(!("caches" in window)){toast("Dein Browser kann keine Karten speichern");return;}
+  if(!navigator.onLine){toast("Zum Speichern brauchst du Netz, am besten WLAN");return;}
+  let jobs; try{ jobs=await buildJob(mode); }catch(e){ toast(e.message); return; }
+  const cache=await caches.open(SAVED_CACHE);
+  const todo=[];
+  for(const j of jobs){ const k=j.kind==="dop"?dopKey(j.z,j.x,j.y):omtKey(j.z,j.x,j.y); if(!(await cache.match(k))) todo.push({...j,key:k}); }
+  if(!todo.length){ toast("Alles schon gespeichert"); return; }
+  const mb=Math.max(1,Math.round((todo.filter(j=>j.kind==="dop").length*55+todo.filter(j=>j.kind==="omt").length*35)/1024));
+  if(todo.length>8000){ toast(`Das wären ${todo.length.toLocaleString("de-DE")} Kartenteile, zu viel auf einmal. Bitte weniger Strecken einschalten.`); return; }
+  const ok=await ask("Karten speichern?",`${todo.length.toLocaleString("de-DE")} Kartenteile, ungefähr ${mb} MB. Am besten im WLAN. Du kannst die App währenddessen weiter benutzen, solltest sie aber geöffnet lassen.`,"Jetzt speichern");
+  if(!ok) return;
+  try{ if(navigator.storage&&navigator.storage.persist) await navigator.storage.persist(); }catch{}
+  let tmpl=null; if(todo.some(j=>j.kind==="omt")){ try{ tmpl=await omtTemplate(); }catch{ toast("Straßennamen konnten nicht geladen werden, speichere nur das Luftbild"); } }
+  offAbort={stop:false}; const me_=offAbort;
+  $("#offProg").hidden=false; $("#offLines").disabled=$("#offView").disabled=true;
+  let done=0, fail=0; const total=todo.length;
+  const upd=()=>{ $("#offBar").style.width=(done/total*100).toFixed(1)+"%"; $("#offTxt").textContent=`${done.toLocaleString("de-DE")} von ${total.toLocaleString("de-DE")} gespeichert${fail?` · ${fail} fehlgeschlagen`:""}`; };
+  upd();
+  const queue=todo.slice();
+  async function worker(){
+    while(queue.length&&!me_.stop){
+      const j=queue.shift();
+      const url=j.kind==="dop"?dopUrl(j.z,j.x,j.y):(tmpl?tmpl.replace("{z}",j.z).replace("{x}",j.x).replace("{y}",j.y):null);
+      if(url){
+        let okk=false;
+        for(let t=0;t<2&&!okk;t++){ try{ const r=await fetch(url,{mode:"cors"}); if(r.ok){ await cache.put(j.key,r); okk=true; } }catch{} }
+        if(!okk) fail++;
+      }
+      done++; if(done%10===0||done===total) upd();
+    }
+  }
+  await Promise.all(Array.from({length:6},worker));
+  $("#offProg").hidden=true; $("#offLines").disabled=$("#offView").disabled=false; offAbort=null;
+  toast(me_.stop?"Speichern abgebrochen. Bereits gespeicherte Teile bleiben erhalten.":`Fertig: ${(done-fail).toLocaleString("de-DE")} Kartenteile gespeichert`);
+  updateOffInfo();
+}
+async function updateOffInfo(){
+  if(!("caches" in window)){ $("#offInfo").textContent="Dein Browser unterstützt keine Offline-Karten."; return; }
+  const n=(await (await caches.open(SAVED_CACHE)).keys()).length;
+  let usage=""; try{ const e=await navigator.storage.estimate(); usage=` · App-Speicher gesamt ${Math.round(e.usage/1048576)} MB`; }catch{}
+  $("#offInfo").textContent=n?`Gespeichert: ${n.toLocaleString("de-DE")} Kartenteile${usage}`:"Noch keine Karten gespeichert.";
+  $("#offSum").textContent=n?"gespeichert":""; $("#offClear").hidden=!n;
+}
+$("#offLines").onclick=()=>runOffline("lines");
+$("#offView").onclick=()=>{closeSheets();setTimeout(()=>runOfflineView(),350);};
+async function runOfflineView(){ await runOffline("view"); }
+$("#offStop").onclick=()=>{ if(offAbort) offAbort.stop=true; };
+$("#offClear").onclick=async()=>{ if(!(await ask("Gespeicherte Karten löschen?","Luftbild und Straßennamen für offline werden vom Handy entfernt. Strecken und Objekte bleiben.","Löschen"))) return; await caches.delete(SAVED_CACHE); updateOffInfo(); toast("Offline-Karten gelöscht"); };
+document.querySelector('details[data-fold="offline"]').addEventListener("toggle",e=>{ if(e.target.open) updateOffInfo(); });
+updateOffInfo();
 
 /* ============ EINFÜHRUNG für neue Nutzer ============ */
 function tourSteps(){
