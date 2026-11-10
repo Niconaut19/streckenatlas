@@ -153,6 +153,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .astack{display:flex;flex:none}
 .astack .avatar{width:30px;height:30px;font-size:12px;border:2px solid var(--white);margin-left:-9px}
 .astack .avatar:first-child{margin-left:0}
+.astack .odot{width:9px;height:9px;border-width:1.5px;right:-2px;bottom:-2px}
 .rchev{width:18px;height:18px;stroke:var(--muted);stroke-width:2.4;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .pill{background:var(--red);color:#fff;font-weight:800;font-size:12px;min-width:22px;height:22px;padding:0 7px;border-radius:999px;display:grid;place-items:center;flex:none;font-variant-numeric:tabular-nums}
 .backbtn{width:36px;height:36px;border-radius:50%;border:0;background:var(--grey-1);display:grid;place-items:center;cursor:pointer;flex:none;margin-left:-8px}
@@ -1639,7 +1640,7 @@ const initial = p => esc((p.name||p.email||"?").trim()[0]?.toUpperCase()||"?");
 const pName = p => p.name||p.email||"Unbekannt";
 function renderTeamRow(){
   const active=team.filter(p=>p.role!=="wartend"), waiting=team.length-active.length;
-  $("#teamStack").innerHTML=active.slice(0,4).map(p=>`<span class="avatar">${initial(p)}</span>`).join("");
+  $("#teamStack").innerHTML=active.slice(0,4).map(p=>`<span class="avatar">${initial(p)}${(typeof isOnline==="function"&&isOnline(p.id))?'<i class="odot" title="online"></i>':""}</span>`).join("");
   $("#teamSum").textContent=`${active.length} ${active.length===1?"Mitglied":"Mitglieder"}`+(waiting?` · ${waiting} neu`:"");
   $("#teamPending").hidden=!waiting; $("#teamPending").textContent=waiting;
 }
@@ -1647,7 +1648,7 @@ function personRow(p){
   const self=p.id===me.id;
   if(p.role==="wartend") return `<div class="opt"><span class="avatar">${initial(p)}</span><span class="lbl"><span class="lname">${esc(pName(p))}</span><small class="lname">${esc(p.email||"")}</small></span>
     <button type="button" class="addbtn" data-approve="${p.id}">Freischalten</button><button type="button" class="iconbtn" data-person="${p.id}" aria-label="Mehr zu ${esc(pName(p))}"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></div>`;
-  return `<button type="button" class="opt person" data-person="${p.id}"><span class="avatar">${initial(p)}</span><span class="lbl"><span class="lname">${esc(pName(p))}</span></span>${self?`<span class="me-tag">Du</span>`:""}<svg class="rchev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>`;
+  return `<button type="button" class="opt person" data-person="${p.id}"><span class="avatar">${initial(p)}${(typeof isOnline==="function"&&isOnline(p.id))?'<i class="odot" title="online"></i>':""}</span><span class="lbl"><span class="lname">${esc(pName(p))}</span></span>${self?`<span class="me-tag">Du</span>`:""}<svg class="rchev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>`;
 }
 const teamOpen=store.get("sa_team_open",{admin:true,mitarbeiter:true});
 function renderTeam(){
@@ -2246,6 +2247,7 @@ function updateChatSub(){
 function onPresence(ids){
   onlineIds=new Set(ids.filter(id=>id!==me?.id));
   if(chatOpen){ chatConv?updateChatSub():renderConvs(); }
+  try{ if($("#sheetTeam").classList.contains("open")) renderTeam(); if($("#sheetUser").classList.contains("open")) renderTeamRow(); }catch{}
 }
 async function loadSeen(){ try{ (await api.listSeen()).forEach(r=>{seenAt[r.user_id]=r.seen_at;}); if(chatOpen&&chatConv) updateChatSub(); }catch{} }
 const showOnline=()=>cn.online!==false;
