@@ -595,6 +595,8 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
     <div class="group"><h3>Chat</h3>
       <div class="list">
         <label class="opt"><span class="lbl">Banner bei neuen Nachrichten<br><small>Oben auf dem Bildschirm, wie bei WhatsApp</small></span><span class="toggle"><input type="checkbox" id="cnBanner"><i></i></span></label>
+        <label class="opt"><span class="lbl">Ton bei neuen Nachrichten<br><small>Solange die App geöffnet ist</small></span><span class="toggle"><input type="checkbox" id="cnSound"><i></i></span></label>
+        <button type="button" class="opt setrow" id="cnTest"><span class="lbl">Ton testen</span><svg class="rchev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>
         <label class="opt" id="cnSysRow"><span class="lbl">Auch als Mitteilung des Handys<br><small>Wenn die App im Hintergrund noch offen ist</small></span><span class="toggle"><input type="checkbox" id="cnSys"><i></i></span></label>
       </div>
     </div>
@@ -789,7 +791,32 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const fmtDate = iso => new Date(iso).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"});
 let toastT; function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("on");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("on"),3000);}
 const store = { get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}}, set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}} };
-const vibrate = ms => { try{navigator.vibrate&&navigator.vibrate(ms)}catch{} };
+const vibrate = ms => { try{navigator.vibrate&&navigator.vibrate(ms)}catch{} };   // nur Android, iPhone erlaubt das Web-Apps nicht
+/* Benachrichtigungston: wird erzeugt, keine Datei nötig. iPhones erlauben Töne erst nach dem ersten Antippen der App. */
+let audioCtx=null;
+try{ if(navigator.audioSession) navigator.audioSession.type="ambient"; }catch{}   // Lautlos-Schalter respektieren
+function unlockAudio(){
+  try{
+    if(!audioCtx){ const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return; audioCtx=new AC(); }
+    if(audioCtx.state==="suspended") audioCtx.resume();
+    const b=audioCtx.createBuffer(1,1,22050), src=audioCtx.createBufferSource(); src.buffer=b; src.connect(audioCtx.destination); src.start(0);
+  }catch{}
+}
+["pointerdown","touchend","keydown"].forEach(t=>document.addEventListener(t,unlockAudio,{passive:true}));
+function playTone(kind){
+  try{
+    if(!audioCtx||audioCtx.state!=="running") return false;
+    const t0=audioCtx.currentTime, notes=kind==="soft"?[[988,0,.09]]:[[880,0,.12],[1319,.11,.22]];
+    const vol=kind==="soft"?0.12:0.22;
+    for(const [f,start,len] of notes){
+      const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+      o.type="sine"; o.frequency.value=f;
+      g.gain.setValueAtTime(0,t0+start); g.gain.linearRampToValueAtTime(vol,t0+start+0.012); g.gain.exponentialRampToValueAtTime(0.0001,t0+start+len);
+      o.connect(g); g.connect(audioCtx.destination); o.start(t0+start); o.stop(t0+start+len+0.02);
+    }
+    return true;
+  }catch{ return false; }
+}
 
 /* ============ BACKEND: Supabase oder Demo ============ */
 function supabaseBackend(){
@@ -2101,7 +2128,7 @@ function onChatChange(payload){
     const m=payload.new; if(!visible(m)||chatMsgs.some(x=>x.id===m.id)) return;
     chatMsgs.push(m); if(chatMsgs.length>600) chatMsgs.shift();
     const c=convOf(m);
-    if(chatOpen&&chatConv===c){ renderChat(); markRead(c); }   // markRead prüft, ob die App sichtbar ist
+    if(chatOpen&&chatConv===c){ renderChat(); markRead(c); if(m.user_id!==me?.id&&cn.sound&&document.visibilityState==="visible") playTone("soft"); }   // markRead prüft, ob die App sichtbar ist
     else { updateChatBadge(); if(chatOpen&&!chatConv) renderConvs();
       if(m.user_id!==me?.id) showChatBanner(m); }
   } else if(payload.eventType==="DELETE"){
@@ -2111,7 +2138,9 @@ function onChatChange(payload){
 }
 
 /* ============ NACHRICHTEN-BANNER (wie bei WhatsApp) ============ */
-const cn=Object.assign({banner:true,sys:false},store.get("sa_chatnotify",{}));
+const cn=Object.assign({banner:true,sys:false,sound:true},store.get("sa_chatnotify",{}));
+$("#cnSound").checked=cn.sound; $("#cnSound").onchange=e=>{cn.sound=e.target.checked;store.set("sa_chatnotify",cn); if(cn.sound) playTone();};
+$("#cnTest").onclick=()=>{ unlockAudio(); setTimeout(()=>{ if(!playTone()) toast("Ton konnte nicht abgespielt werden. Ist das Handy laut gestellt?"); },60); };
 $("#cnBanner").checked=cn.banner; $("#cnSys").checked=cn.sys; $("#cnSysRow").hidden=!("Notification" in window);
 $("#cnBanner").onchange=e=>{cn.banner=e.target.checked;store.set("sa_chatnotify",cn);};
 $("#cnSys").onchange=async e=>{
@@ -2126,6 +2155,7 @@ let mbTimer=null, mbConv=null, mbCount=0;
 function showChatBanner(m,count){
   const c=convOf(m), name=nameOf(m.user_id), text=m.body||"hat einen Standort geteilt";
   vibrate([30,40,30]);
+  if(cn.sound&&document.visibilityState==="visible") playTone();
   if(document.visibilityState!=="visible"){
     if(cn.sys&&"Notification" in window&&Notification.permission==="granted"){
       const title=c===TEAM?`${name} · Team`:name;
