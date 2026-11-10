@@ -111,3 +111,14 @@ create policy "Gelesen sehen"  on public.chat_reads for select to authenticated
 create policy "Gelesen setzen" on public.chat_reads for insert to authenticated with check (is_member() and user_id = auth.uid());
 create policy "Gelesen ändern" on public.chat_reads for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 alter publication supabase_realtime add table public.chat_reads;
+
+-- "Zuletzt online": pro Person ein Zeitstempel, nur die Person selbst darf ihn setzen oder löschen
+create table if not exists public.last_seen (
+  user_id uuid primary key default auth.uid() references public.profiles(id) on delete cascade,
+  seen_at timestamptz not null default now()
+);
+alter table public.last_seen enable row level security;
+create policy "Zuletzt online sehen"   on public.last_seen for select to authenticated using (is_member());
+create policy "Zuletzt online setzen"  on public.last_seen for insert to authenticated with check (user_id = auth.uid() and is_member());
+create policy "Zuletzt online ändern"  on public.last_seen for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy "Zuletzt online löschen" on public.last_seen for delete to authenticated using (user_id = auth.uid());

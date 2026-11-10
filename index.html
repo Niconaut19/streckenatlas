@@ -386,6 +386,13 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .mbhead b{flex:1;min-width:0;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mbhead time{font-size:12px;color:var(--muted);flex:none}
 #mbBody{font-size:14px;color:var(--ink-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.chathead{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.2}
+.chathead h2{flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chathead small{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chathead small.on{color:#2f9e44;font-weight:700}
+.avatar{position:relative}
+.odot{position:absolute;right:-1px;bottom:-1px;width:13px;height:13px;border-radius:50%;background:#2f9e44;border:2.5px solid var(--white)}
+.conv .onl{font-style:normal;font-weight:600;font-size:12.5px;color:#2f9e44}
 .toast{position:fixed;z-index:60;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);
   transform:translate(-50%,20px);opacity:0;transition:all .3s var(--ease);pointer-events:none;
   background:var(--inv-bg);color:var(--inv-fg);padding:12px 18px;border-radius:12px;font-weight:600;max-width:calc(100% - 110px);text-align:center;box-shadow:var(--shadow)}
@@ -542,7 +549,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 <!-- Chat: Übersicht (Team + Kollegen) und Unterhaltung -->
 <section class="sheet chat" id="sheetChat" aria-label="Chat">
   <div class="grab"></div>
-  <header><button class="backbtn" id="chatBack" hidden aria-label="Zurück zur Übersicht"><svg viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></svg></button><h2 id="chatTitle">Chat</h2><button class="x" data-close aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+  <header><button class="backbtn" id="chatBack" hidden aria-label="Zurück zur Übersicht"><svg viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></svg></button><div class="chathead"><h2 id="chatTitle">Chat</h2><small id="chatSub" hidden></small></div><button class="x" data-close aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
   <div class="chatconvs" id="chatConvs">
     <div class="field search" id="chatSearchField" hidden><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="chatSearch" type="search" placeholder="Kollegen suchen" aria-label="Kollegen suchen" autocomplete="off"></div>
     <div class="list" id="convList"></div>
@@ -594,6 +601,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
     </div></details>
     <div class="group"><h3>Chat</h3>
       <div class="list">
+        <label class="opt"><span class="lbl">Meinen Online-Status zeigen<br><small>Kollegen sehen, wann du die App offen hast</small></span><span class="toggle"><input type="checkbox" id="cnOnline"><i></i></span></label>
         <label class="opt"><span class="lbl">Banner bei neuen Nachrichten<br><small>Oben auf dem Bildschirm, wie bei WhatsApp</small></span><span class="toggle"><input type="checkbox" id="cnBanner"><i></i></span></label>
         <label class="opt"><span class="lbl">Ton bei neuen Nachrichten<br><small>Solange die App geöffnet ist</small></span><span class="toggle"><input type="checkbox" id="cnSound"><i></i></span></label>
         <label class="opt"><span class="lbl">Ton<br><small>Beim Auswählen hörst du ihn</small></span><select id="cnTone" class="minisel"></select></label>
@@ -873,7 +881,21 @@ function supabaseBackend(){
     async listReads(){const {data,error}=await sb.from("chat_reads").select("*"); return error?[]:data;},
     async setRead(conv,read_at){const {data:{session}}=await sb.auth.getSession(); if(!session) return;
       const {error}=await sb.from("chat_reads").upsert({user_id:session.user.id,conv,read_at},{onConflict:"user_id,conv"}); if(error) console.warn("Lesebestätigung:",error.message);},
-    subscribeReads(cb){sb.channel("chat_reads").on("postgres_changes",{event:"*",schema:"public",table:"chat_reads"},cb).subscribe();}
+    subscribeReads(cb){sb.channel("chat_reads").on("postgres_changes",{event:"*",schema:"public",table:"chat_reads"},cb).subscribe();},
+    /* Wer ist gerade online: Supabase Presence (nur solange die App offen ist) */
+    presence(uid,onSync){
+      const ch=sb.channel("online",{config:{presence:{key:uid}}});
+      let want=false, joined=false;
+      ch.on("presence",{event:"sync"},()=>onSync(Object.keys(ch.presenceState())));
+      ch.subscribe(st=>{ if(st==="SUBSCRIBED"){ joined=true; if(want) ch.track({at:new Date().toISOString()}); } });
+      return {
+        set(on){ want=on; if(!joined) return; on?ch.track({at:new Date().toISOString()}):ch.untrack(); }
+      };
+    },
+    async listSeen(){const {data,error}=await sb.from("last_seen").select("*"); return error?[]:data;},
+    async setSeen(){const {data:{session}}=await sb.auth.getSession(); if(!session) return;
+      await sb.from("last_seen").upsert({user_id:session.user.id,seen_at:new Date().toISOString()},{onConflict:"user_id"});},
+    async clearSeen(){const {data:{session}}=await sb.auth.getSession(); if(!session) return; await sb.from("last_seen").delete().eq("user_id",session.user.id);}
   };
 }
 function demoBackend(){
@@ -907,7 +929,10 @@ function demoBackend(){
     subscribeMessages(){},
     async listReads(){return store.get("sa_demo_reads",[]);},
     async setRead(conv,read_at){const a=store.get("sa_demo_reads",[]).filter(r=>!(r.user_id===current&&r.conv===conv));a.push({user_id:current,conv,read_at});store.set("sa_demo_reads",a);},
-    subscribeReads(){}
+    subscribeReads(){},
+    presence(uid,onSync){ return {set(on){ onSync(on?[uid]:[]); }}; },
+    async listSeen(){return [{user_id:"u-anna",seen_at:new Date(Date.now()-17*60000).toISOString()},{user_id:"u-ben",seen_at:new Date(Date.now()-26*3600000).toISOString()}];},
+    async setSeen(){}, async clearSeen(){}
   };
 }
 const api = CONFIG.SUPABASE_URL ? supabaseBackend() : demoBackend();
@@ -1984,19 +2009,19 @@ function renderConvs(){
     .sort((a,b)=>((last[b.id]?.created_at||"")>(last[a.id]?.created_at||"")?1:(last[b.id]?.created_at||"")<(last[a.id]?.created_at||"")?-1:(a.name||"").localeCompare(b.name||"")));
   $("#chatSearchField").hidden=colleagues().length<6;
   const row=(id,name,av,lm)=>{const u=unreadIn(id);
-    return `<button type="button" class="opt conv${u?" unread":""}" data-conv="${esc(id)}">${av}<span class="lbl"><b><span>${esc(name)}</span>${lm?`<time>${shortStamp(lm.created_at)}</time>`:""}</b><small>${esc(lm?preview(lm):(id===TEAM?"Nachrichten an alle freigeschalteten Kollegen":"Noch keine Nachrichten"))}</small></span>${u?`<span class="cbadge">${u>99?"99+":u}</span>`:""}</button>`;};
+    return `<button type="button" class="opt conv${u?" unread":""}" data-conv="${esc(id)}">${av}<span class="lbl"><b><span>${esc(name)}${id===TEAM&&onlineCount()?` <em class="onl">· ${onlineCount()} online</em>`:""}</span>${lm?`<time>${shortStamp(lm.created_at)}</time>`:""}</b><small>${esc(lm?preview(lm):(id===TEAM?"Nachrichten an alle freigeschalteten Kollegen":"Noch keine Nachrichten"))}</small></span>${u?`<span class="cbadge">${u>99?"99+":u}</span>`:""}</button>`;};
   let html=q?"":row(TEAM,"Team",`<span class="avatar team">${TEAM_SVG}</span>`,last[TEAM]);
-  html+=people.map(p=>row(p.id,p.name||p.email,`<span class="avatar">${esc((p.name||p.email||"?")[0].toUpperCase())}</span>`,last[p.id])).join("");
+  html+=people.map(p=>row(p.id,p.name||p.email,`<span class="avatar">${esc((p.name||p.email||"?")[0].toUpperCase())}${isOnline(p.id)?'<i class="odot" title="online"></i>':""}</span>`,last[p.id])).join("");
   $("#convList").innerHTML=html||'<div class="opt"><span class="hint">Niemand gefunden.</span></div>';
   $("#convHint").textContent=colleagues().length?"Nachrichten an einzelne Kollegen sieht nur ihr beide.":"Sobald du Kollegen freischaltest, kannst du sie hier auch einzeln anschreiben.";
 }
 function showConvList(){
-  chatConv=null; $("#chatTitle").textContent="Chat"; $("#chatBack").hidden=true;
+  chatConv=null; $("#chatTitle").textContent="Chat"; $("#chatBack").hidden=true; updateChatSub();
   $("#chatConvs").hidden=false; $("#chatList").hidden=true; $("#chatForm").hidden=true;
   renderConvs();
 }
 function openConv(c){
-  chatConv=c; $("#chatTitle").textContent=c===TEAM?"Team":nameOf(c); $("#chatBack").hidden=false;
+  chatConv=c; $("#chatTitle").textContent=c===TEAM?"Team":nameOf(c); $("#chatBack").hidden=false; updateChatSub();
   $("#chatConvs").hidden=true; $("#chatList").hidden=false; $("#chatForm").hidden=false;
   $("#chatInput").placeholder=c===TEAM?"Nachricht an das Team":`Nachricht an ${nameOf(c).split(" ")[0]}`;
   renderChat(); markRead(c); autoGrow();
@@ -2198,6 +2223,49 @@ function openChatTo(c){ closeSheets(); setAddMode(false); openSheet("#sheetChat"
 })();
 if("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message",e=>{ if(e.data&&e.data.openChat) openChatTo(e.data.openChat); });
 
+/* ============ ONLINE-STATUS ============ */
+let onlineIds=new Set(), seenAt={}, pres=null, seenTimer=null;
+const isOnline=id=>onlineIds.has(id);
+const onlineCount=()=>colleagues().filter(p=>isOnline(p.id)).length;
+function relSeen(iso){
+  const d=new Date(iso), now=new Date(), min=Math.round((now-d)/60000);
+  if(min<2) return "gerade eben"; if(min<60) return `vor ${min} Min.`;
+  const y=new Date(); y.setDate(now.getDate()-1);
+  const hm=d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
+  if(d.toDateString()===now.toDateString()) return `heute ${hm}`;
+  if(d.toDateString()===y.toDateString()) return `gestern ${hm}`;
+  return `am ${d.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"})}`;
+}
+function updateChatSub(){
+  const el=$("#chatSub"); if(!el) return;
+  let t="", on=false;
+  if(chatConv===TEAM){ const n=onlineCount(), names=colleagues().filter(p=>isOnline(p.id)).map(p=>(p.name||p.email||"").split(" ")[0]); t=n?`${n} online: ${names.join(", ")}`:"Gerade niemand online"; on=n>0; }
+  else if(chatConv){ if(isOnline(chatConv)){t="online";on=true;} else if(seenAt[chatConv]) t="zuletzt online "+relSeen(seenAt[chatConv]); }
+  el.textContent=t; el.hidden=!t; el.classList.toggle("on",on);
+}
+function onPresence(ids){
+  onlineIds=new Set(ids.filter(id=>id!==me?.id));
+  if(chatOpen){ chatConv?updateChatSub():renderConvs(); }
+}
+async function loadSeen(){ try{ (await api.listSeen()).forEach(r=>{seenAt[r.user_id]=r.seen_at;}); if(chatOpen&&chatConv) updateChatSub(); }catch{} }
+const showOnline=()=>cn.online!==false;
+function applyPresence(){
+  const visible=document.visibilityState==="visible";
+  if(pres) pres.set(showOnline()&&visible);
+  clearInterval(seenTimer);
+  if(showOnline()&&visible){ api.setSeen().catch(()=>{}); seenTimer=setInterval(()=>api.setSeen().catch(()=>{}),60000); }
+  else if(showOnline()) api.setSeen().catch(()=>{});      // beim Verlassen: Zeitpunkt merken
+}
+function startPresence(){
+  if(pres||!me||me.role==="wartend") return;
+  try{ pres=api.presence(me.id,onPresence); }catch{}
+  applyPresence(); loadSeen();
+}
+document.addEventListener("visibilitychange",()=>{ if(pres) applyPresence(); });
+$("#cnOnline").checked=showOnline();
+$("#cnOnline").onchange=e=>{ cn.online=e.target.checked; store.set("sa_chatnotify",cn); applyPresence(); if(!cn.online) api.clearSeen().catch(()=>{}); };
+setInterval(()=>{ if(chatOpen&&chatConv) updateChatSub(); },60000);
+
 /* ============ LIVE-ABGLEICH ============
    Die Live-Verbindung bricht auf dem Handy ab, wenn der Bildschirm aus ist oder die App im Hintergrund läuft.
    Deshalb zusätzlich: sofort abgleichen beim Zurückkehren und bei wieder verfügbarem Netz, sonst alle 15 Sekunden. */
@@ -2205,7 +2273,7 @@ let lastSync=0, syncing=false;
 async function syncNow(){
   if(syncing||!me||me.role==="wartend") return;
   syncing=true; lastSync=Date.now();
-  try{ await Promise.all([refreshMarkers(true),loadChat(),loadReads()]); } finally{ syncing=false; }
+  try{ await Promise.all([refreshMarkers(true),loadChat(),loadReads(),loadSeen()]); } finally{ syncing=false; }
 }
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&Date.now()-lastSync>2000) syncNow(); });
 window.addEventListener("online",syncNow);
@@ -2479,7 +2547,7 @@ async function start(){
   $("#userRole").textContent=me.role==="admin"?"Admin":"Mitarbeiter"; $("#userRole").className=me.role==="admin"?"admin":"";
   await refreshMarkers();
   if(!subscribed){api.subscribe(()=>refreshMarkers());api.subscribeMessages(onChatChange);api.subscribeReads(onReadChange);subscribed=true;}
-  loadReads();
+  loadReads(); startPresence();
   loadChat();
   if(api.demo && !store.get("sa_demo_seen",false)){store.set("sa_demo_seen",true);toast("Demo-Modus: Daten bleiben nur auf diesem Gerät");}
   if(!store.get(tourKey(),false)) setTimeout(startTour,700);
