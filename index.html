@@ -362,6 +362,17 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .offpill .dot{width:8px;height:8px;border-radius:50%;background:#f59f00}
 .offbar{height:8px;border-radius:4px;background:var(--grey-1);overflow:hidden}
 .offbar i{display:block;height:100%;width:0;background:var(--red);transition:width .3s}
+@media (max-width:440px){ #userChip .who{display:none} #userChip{padding:0 7px} }
+.profcard{display:flex;align-items:center;gap:12px;background:var(--grey-1);border-radius:var(--r);padding:14px}
+.profcard .avatar{width:48px;height:48px;font-size:19px;background:var(--white)}
+.profinfo{flex:1;min-width:0;display:flex;flex-direction:column}
+.profinfo b{font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.profinfo small{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rolepill{font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;background:var(--white);color:var(--ink-2);flex:none}
+.rolepill.admin{background:var(--red);color:#fff}
+.setrow{width:100%;border:0;border-top:1px solid var(--grey-1);background:var(--white);text-align:left;font:inherit;color:var(--ink);cursor:pointer}
+.setrow:first-child{border-top:0}
+.setrow .rchev,.rchev{width:18px;height:18px;stroke:var(--muted);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .toast{position:fixed;z-index:60;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);
   transform:translate(-50%,20px);opacity:0;transition:all .3s var(--ease);pointer-events:none;
   background:var(--inv-bg);color:var(--inv-fg);padding:12px 18px;border-radius:12px;font-weight:600;max-width:calc(100% - 110px);text-align:center;box-shadow:var(--shadow)}
@@ -414,6 +425,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
   <button class="brand brandbtn" id="btnReload" title="App aktualisieren" aria-label="App aktualisieren"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M8 3 6 21M16 3l2 18M6.8 8h10.4M6.2 14h11.6"/></svg></span>Streckenatlas</button>
   <div class="spacer"></div>
   <button class="chip iconchip" id="btnKm" hidden title="Suchen" aria-label="Suchen"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg></button>
+  <button class="chip iconchip" id="btnSettings" hidden title="Einstellungen" aria-label="Einstellungen"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   <button class="chip" id="userChip" hidden><span class="avatar" id="userAvatar"></span><span class="who"><b id="userName"></b><small id="userRole"></small></span></button>
 </div>
 
@@ -444,18 +456,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
         <label><input type="radio" name="base" value="osm" id="baseOsm">Straße</label>
       </div>
     </div></details>
-    <details class="group fold" data-fold="offline"><summary><h3>Offline-Karten</h3><span class="sumnote" id="offSum"></span><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="foldbody stack">
-      <p class="hint">Speichert Luftbild sowie Straßen und Ortsnamen auf dem Handy, damit du sie ohne Netz siehst. Strecken, Bahnhöfe, Bahnübergänge, Kilometer und eure Objekte sind offline sowieso dabei.</p>
-      <button class="btn primary block" type="button" id="offLines">Meine Strecken speichern</button>
-      <button class="btn block" type="button" id="offView">Aktuellen Kartenausschnitt speichern</button>
-      <div id="offProg" class="stack" hidden>
-        <div class="offbar"><i id="offBar"></i></div>
-        <p class="hint" id="offTxt"></p>
-        <button class="btn small" type="button" id="offStop">Abbrechen</button>
-      </div>
-      <p class="hint" id="offInfo"></p>
-      <button class="linkbtn" type="button" id="offClear" hidden>Gespeicherte Karten löschen</button>
-    </div></details>
+
     <details class="group fold" data-fold="poi"><summary><h3>Essen &amp; Einkaufen</h3><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="foldbody"><div class="list">
       <label class="opt"><span class="tag" style="background:#fff;border:3px solid #e8590c;min-width:18px;height:18px;padding:0;border-radius:50%"></span><span class="lbl">Essen &amp; Trinken<br><small>Imbiss, Restaurant, Café, Bäcker</small></span><span class="toggle"><input type="checkbox" id="poiFood" data-poi="food"><i></i></span></label>
       <label class="opt"><span class="tag" style="background:#fff;border:3px solid #1971c2;min-width:18px;height:18px;padding:0;border-radius:50%"></span><span class="lbl">Einkaufen<br><small>Supermarkt, Kiosk, Apotheke, Läden</small></span><span class="toggle"><input type="checkbox" id="poiShop" data-poi="shop"><i></i></span></label>
@@ -542,17 +543,20 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
   </form>
 </section>
 
-<!-- Konto / Team -->
-<section class="sheet" id="sheetUser" aria-label="Konto">
+<!-- Einstellungen -->
+<section class="sheet" id="sheetSettings" aria-label="Einstellungen">
   <div class="grab"></div>
-  <header><h2>Konto</h2><button class="x" data-close aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+  <header><h2>Einstellungen</h2><button class="x" data-close aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
   <div class="body">
-    <div class="group" id="demoSwitch" hidden><h3>Demo: Person wechseln</h3>
-      <p class="hint" style="margin-bottom:10px">Ohne Datenbank läuft die App nur auf diesem Gerät. Wechsle die Person, um die Rechte auszuprobieren.</p>
-      <div class="list" id="demoUsers"></div></div>
-    <div class="group" id="teamBox" hidden><h3>Team &amp; Rollen</h3>
-      <div class="list"><button type="button" class="opt teamrow" id="openTeam"><span class="astack" id="teamStack"></span><span class="lbl"><span class="lname">Team verwalten</span><small class="lname" id="teamSum"></small></span><span class="pill" id="teamPending" hidden></span><svg class="rchev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></div></div>
-    <div class="group"><h3>Hinweise in der Nähe</h3>
+    <div class="group"><h3>Darstellung</h3>
+      <div class="seg" id="themeSeg">
+        <label><input type="radio" name="theme" value="light" id="thLight">Hell</label>
+        <label><input type="radio" name="theme" value="dark" id="thDark">Dunkel</label>
+        <label><input type="radio" name="theme" value="auto" id="thAuto">Automatisch</label>
+      </div>
+      <p class="hint" style="margin-top:8px">„Automatisch“ folgt der Einstellung deines Handys.</p>
+    </div>
+    <details class="group fold" data-fold="set-nb"><summary><h3>Hinweise in der Nähe</h3><span class="sumnote" id="nbSum"></span><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="foldbody">
       <p class="hint" style="margin-bottom:10px">Meldet sich, wenn du an eine Anlage herankommst. Funktioniert, solange die App geöffnet ist.</p>
       <div class="list">
         <label class="opt"><span class="lbl">Hinweise einschalten</span><span class="toggle"><input type="checkbox" id="nbOn"><i></i></span></label>
@@ -562,18 +566,42 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
       <details class="tgroup" id="nbTypesFold" style="margin-top:14px"><summary><h3>Bei diesen Arten</h3><small class="hint" id="nbTypesSum" style="font-size:13px"></small><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
         <div class="typetools"><button type="button" class="addbtn" id="nbAll">Alle</button><button type="button" class="addbtn" id="nbNone">Keine</button></div>
         <div class="list" id="nbTypes"></div></details>
-    </div>
-    <div class="group"><h3>Darstellung</h3>
-      <div class="seg" id="themeSeg">
-        <label><input type="radio" name="theme" value="light" id="thLight">Hell</label>
-        <label><input type="radio" name="theme" value="dark" id="thDark">Dunkel</label>
-        <label><input type="radio" name="theme" value="auto" id="thAuto">Automatisch</label>
+    </div></details>
+    <details class="group fold" data-fold="offline"><summary><h3>Offline-Karten</h3><span class="sumnote" id="offSum"></span><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="foldbody stack">
+      <p class="hint">Speichert Luftbild sowie Straßen und Ortsnamen auf dem Handy, damit du sie ohne Netz siehst. Strecken, Bahnhöfe, Bahnübergänge, Kilometer und eure Objekte sind offline sowieso dabei.</p>
+      <button class="btn primary block" type="button" id="offLines">Meine Strecken speichern</button>
+      <button class="btn block" type="button" id="offView">Aktuellen Kartenausschnitt speichern</button>
+      <div id="offProg" class="stack" hidden>
+        <div class="offbar"><i id="offBar"></i></div>
+        <p class="hint" id="offTxt"></p>
+        <button class="btn small" type="button" id="offStop">Abbrechen</button>
       </div>
-      <p class="hint" style="margin-top:8px">„Automatisch“ folgt der Einstellung deines Handys.</p>
+      <p class="hint" id="offInfo"></p>
+      <button class="linkbtn" type="button" id="offClear" hidden>Gespeicherte Karten löschen</button>
+    </div></details>
+    <div class="group"><h3>Hilfe</h3>
+      <div class="list">
+        <button type="button" class="opt setrow" id="btnTour"><span class="lbl">Einführung ansehen</span><svg class="rchev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>
+        <button type="button" class="opt setrow" id="btnCheckUpd"><span class="lbl">Nach neuer Version suchen<br><small id="appStand"></small></span><svg class="rchev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>
+      </div>
     </div>
-    <button class="btn block" id="btnTour">Einführung ansehen</button>
+  </div>
+</section>
+
+<!-- Konto / Team -->
+<section class="sheet" id="sheetUser" aria-label="Konto">
+  <div class="grab"></div>
+  <header><h2>Konto</h2><button class="x" data-close aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+  <div class="body">
+    <div class="profcard"><span class="avatar" id="profAvatar"></span><div class="profinfo"><b id="profName"></b><small id="profMail"></small></div><span class="rolepill" id="profRole"></span></div>
+    <div class="group" id="demoSwitch" hidden><h3>Demo: Person wechseln</h3>
+      <p class="hint" style="margin-bottom:10px">Ohne Datenbank läuft die App nur auf diesem Gerät. Wechsle die Person, um die Rechte auszuprobieren.</p>
+      <div class="list" id="demoUsers"></div></div>
+    <div class="group" id="teamBox" hidden><h3>Team &amp; Rollen</h3>
+      <div class="list"><button type="button" class="opt teamrow" id="openTeam"><span class="astack" id="teamStack"></span><span class="lbl"><span class="lname">Team verwalten</span><small class="lname" id="teamSum"></small></span><span class="pill" id="teamPending" hidden></span><svg class="rchev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button></div></div>
+
+
     <button class="btn block" id="btnLogout">Abmelden</button>
-    <p class="hint" id="appStand" style="text-align:center"></p>
   </div>
 </section>
 
@@ -983,6 +1011,12 @@ async function checkUpdate(){
 }
 setInterval(checkUpdate,3*60*1000);
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible") checkUpdate();});
+$("#btnCheckUpd").onclick=async()=>{
+  toast("Suche nach neuer Version …");
+  const now=await serverStand();
+  if(now&&loadedStand&&now!==loadedStand){ $("#updBar").hidden=false; closeSheets(); }
+  else toast("Du hast schon die neueste Version");
+};
 $("#updBar").onclick=()=>{$("#updBar").innerHTML="Wird aktualisiert …";location.replace(location.pathname+"?v="+Date.now());};
 
 /* Aufklappbare Bereiche merken */
@@ -1486,7 +1520,9 @@ document.querySelectorAll("[data-close]").forEach(b=>{
 });
 $("#scrim").onclick=closeSheets;
 $("#btnLayers").onclick=()=>{$("#sheetLayers").classList.contains("open")?closeSheets():openSheet("#sheetLayers");};
-$("#userChip").onclick=()=>{renderUserSheet();openSheet("#sheetUser");};
+$("#userChip").onclick=()=>{ if($("#sheetUser").classList.contains("open")){closeSheets();return;} renderUserSheet();openSheet("#sheetUser");};
+$("#btnSettings").onclick=()=>{ if($("#sheetSettings").classList.contains("open")){closeSheets();return;} updateNbSum(); updateOffInfo(); openSheet("#sheetSettings");};
+function updateNbSum(){ const el=$("#nbSum"); if(el) el.textContent=nb.on?`an · ${nb.radius<1000?nb.radius+" m":"1 km"}`:"aus"; }
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("#personModal").hidden){$("#personModal").hidden=true;return;}closeSheets();setAddMode(false);}});
 
 /* Sheet nach unten wischen zum Schließen */
@@ -2210,7 +2246,8 @@ function tourSteps(){
     {sel:"#btnLocate", title:"Dein Standort", text:"Zeigt dich als blauen Punkt und fliegt ganz nah heran. Die Karte folgt dir, bis du sie selbst verschiebst. Einmal tippen holt dich zurück."},
     {title:"Drehen & Neigen", text:"Mit zwei Fingern drehst du die Karte, mit zwei Fingern nach oben wischen neigst du sie. Dann erscheint rechts oben in der Knopfleiste ein Kompass. Antippen richtet die Karte wieder nach Norden aus."},
     {sel:"#btnReload", title:"Aktualisieren", text:"Tippe auf das Logo, um die App neu zu laden und die neueste Version zu holen."},
-    {sel:"#userChip", title:"Dein Konto", text:(admin?"Hier schaltest du unter „Team & Rollen“ neue Kollegen frei. ":"")+"Hier kannst du dich abmelden und diese Einführung jederzeit wieder ansehen."},
+    {sel:"#btnSettings", title:"Einstellungen", text:"Hier stellst du Hell oder Dunkel ein, die Hinweise in der Nähe und die Offline-Karten. Auch diese Einführung findest du hier jederzeit wieder."},
+    {sel:"#userChip", title:"Dein Konto", text:(admin?"Hier verwaltest du unter „Team“ deine Kollegen und schaltest neue frei. ":"")+"Hier siehst du dein Konto und kannst dich abmelden."},
     {title:"Fertig!", text:"Noch ein Tipp: Leg die App auf deinen Home-Bildschirm. Auf dem iPhone in Safari auf „Teilen“ und dann „Zum Home-Bildschirm“, auf Android im Browser-Menü „App installieren“. Dann startet sie wie eine richtige App."}
   ];
 }
@@ -2263,9 +2300,9 @@ function renderNbTypesSum(){const ks=Object.keys(TYPES),n=ks.filter(k=>nb.types[
 const setAllNb=on=>{Object.keys(TYPES).forEach(k=>nb.types[k]=on);saveNb();renderNbSettings();};
 $("#nbAll").onclick=()=>setAllNb(true); $("#nbNone").onclick=()=>setAllNb(false);
 renderNbSettings();
-$("#nbOn").onchange=e=>{nb.on=e.target.checked;saveNb();
+$("#nbOn").onchange=e=>{nb.on=e.target.checked;saveNb();updateNbSum();
   if(nb.on){ if(startWatch(false)) toast("Hinweise an: Du bekommst eine Meldung, wenn du in die Nähe kommst"); if(lastLL) checkNearby(lastLL);} };
-$("#nbRadius").onchange=e=>{nb.radius=e.target.value;saveNb();};
+$("#nbRadius").onchange=e=>{nb.radius=e.target.value;saveNb();updateNbSum();};
 $("#nbTypes").addEventListener("change",e=>{const k=e.target.dataset.nbtype;if(k){nb.types[k]=e.target.checked;saveNb();renderNbTypesSum();}});
 $("#nbSys").onchange=async e=>{
   nb.sys=e.target.checked;
@@ -2317,9 +2354,11 @@ async function start(){
   if(recovering) return;
   $("#gate").hidden = !!me; $("#pending").hidden = !(me && me.role==="wartend");
   const active = me && me.role!=="wartend";
-  $("#fabs").hidden=!active; $("#userChip").hidden=!active; $("#btnKm").hidden=!active;
+  $("#fabs").hidden=!active; $("#userChip").hidden=!active; $("#btnKm").hidden=!active; $("#btnSettings").hidden=!active;
   if(!active) return;
   $("#userName").textContent=me.name; $("#userAvatar").textContent=(me.name||"?")[0].toUpperCase();
+  $("#profName").textContent=me.name; $("#profMail").textContent=me.email||""; $("#profAvatar").textContent=(me.name||"?")[0].toUpperCase();
+  $("#profRole").textContent=me.role==="admin"?"Admin":"Mitarbeiter"; $("#profRole").className="rolepill"+(me.role==="admin"?" admin":"");
   $("#userRole").textContent=me.role==="admin"?"Admin":"Mitarbeiter"; $("#userRole").className=me.role==="admin"?"admin":"";
   await refreshMarkers();
   if(!subscribed){api.subscribe(()=>refreshMarkers());api.subscribeMessages(onChatChange);api.subscribeReads(onReadChange);subscribed=true;}
