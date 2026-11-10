@@ -3,7 +3,7 @@ const SHELL = "sa-shell-v1";        // App-Dateien und Bibliotheken
 const DATA = "sa-data-v1";          // Strecken-, Bahnanlagen- und Kilometerdaten
 const SAVED = "sa-tiles-saved";     // gezielt für offline gespeicherte Kartenteile (bleiben)
 const RUNTIME = "sa-tiles-rt";      // beim Anschauen gemerkte Kartenteile (werden begrenzt)
-const RUNTIME_MAX = 4000;
+const RUNTIME_MAX = 1000;   // ca. 50 MB, älteste werden zuerst entfernt
 
 const SHELL_URLS = [
   "./", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/apple-touch-icon.png", "./icons/favicon-32.png",
