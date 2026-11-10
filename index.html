@@ -682,7 +682,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 <div class="toast" id="toast"></div>
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <script>
 /* ============ EINSTELLUNGEN ============
    Leer lassen = Demo-Modus (nur auf diesem Gerät). */
@@ -1276,12 +1276,15 @@ function drawMarkers(){
   $("#lineFilterInfo").textContent = filt ? `${shown.length} von ${markers.length} Objekten an eingeschalteten Strecken` : "";
   renderTypeList();
 }
-async function refreshMarkers(){
+let markersSig="";
+async function refreshMarkers(quiet){
   try{
-    markers = await api.listMarkers();
+    const ms = await api.listMarkers();
     const ps = await api.listProfiles(); profiles = Object.fromEntries(ps.map(p=>[p.id,p]));
-    drawMarkers();
-  }catch(e){toast("Objekte konnten nicht geladen werden: "+e.message);}
+    const sig=ms.map(m=>m.id+":"+(m.updated_at||"")+":"+m.lat+":"+m.lng).join("|");
+    markers=ms;
+    if(sig!==markersSig||!quiet){ markersSig=sig; drawMarkers(); }   // nur neu zeichnen, wenn sich etwas geändert hat
+  }catch(e){ if(!quiet) toast("Objekte konnten nicht geladen werden: "+e.message); }
 }
 
 /* Hinzufügen */
@@ -1815,7 +1818,7 @@ function markRead(c){
   const serverConv=c===TEAM?TEAM:c;          // bei Einzelchats: ID des Gegenübers
   if(!(pushedRead[c]>=lastAt)){ pushedRead[c]=lastAt; reads[me.id+"|"+serverConv]=lastAt; api.setRead(serverConv,lastAt); }
 }
-async function loadReads(){ try{ reads={}; (await api.listReads()).forEach(r=>{reads[r.user_id+"|"+r.conv]=r.read_at;}); if(chatOpen&&chatConv) renderChat(); }catch{} }
+async function loadReads(){ try{ const n={}; (await api.listReads()).forEach(r=>{n[r.user_id+"|"+r.conv]=r.read_at;}); const ch=JSON.stringify(n)!==JSON.stringify(reads); reads=n; if(ch&&chatOpen) chatConv?renderChat():renderConvs(); }catch{} }
 function onReadChange(p){ const r=p.new; if(!r||!r.user_id) return; reads[r.user_id+"|"+r.conv]=r.read_at; if(chatOpen) chatConv?renderChat():renderConvs(); }
 /* Für eigene Nachrichten: wer hat gelesen? */
 function readersOf(m){
@@ -1894,8 +1897,21 @@ function renderChat(){
   el.innerHTML=html;
   if(atBottom&&!selMsg) el.scrollTop=el.scrollHeight;
 }
+let chatSig="";
 async function loadChat(){
-  try{ chatMsgs=(await api.listMessages()).filter(visible); updateChatBadge(); if(chatOpen){ chatConv?(renderChat(),markRead(chatConv)):renderConvs(); } }
+  try{
+    const fresh=(await api.listMessages()).filter(visible);
+    const sig=fresh.map(m=>m.id).join("|");
+    const pending=chatMsgs.filter(m=>m._pending);
+    const isNew=fresh.filter(m=>m.user_id!==me?.id&&!chatMsgs.some(x=>x.id===m.id));
+    const first=!chatSig; const changed=sig!==chatSig; chatSig=sig;
+    chatMsgs=[...fresh,...pending]; updateChatBadge();
+    if(changed&&chatOpen){ chatConv?(renderChat(),markRead(chatConv)):renderConvs(); }
+    if(!first&&isNew.length&&!(chatOpen&&chatConv&&isNew.every(m=>convOf(m)===chatConv))){
+      const m=isNew[isNew.length-1], c=convOf(m);
+      toast(c===TEAM?`Neue Nachricht im Team von ${nameOf(m.user_id)}`:`${nameOf(m.user_id)} schreibt dir`); vibrate([30,40,30]);
+    }
+  }
   catch(e){ $("#convHint").textContent=e.message||"Chat konnte nicht geladen werden."; }
 }
 $("#btnChat").onclick=()=>{
@@ -1991,6 +2007,20 @@ function onChatChange(payload){
     if(chatOpen) chatConv?renderChat():renderConvs();
   }
 }
+
+/* ============ LIVE-ABGLEICH ============
+   Die Live-Verbindung bricht auf dem Handy ab, wenn der Bildschirm aus ist oder die App im Hintergrund läuft.
+   Deshalb zusätzlich: sofort abgleichen beim Zurückkehren und bei wieder verfügbarem Netz, sonst alle 15 Sekunden. */
+let lastSync=0, syncing=false;
+async function syncNow(){
+  if(syncing||!me||me.role==="wartend") return;
+  syncing=true; lastSync=Date.now();
+  try{ await Promise.all([refreshMarkers(true),loadChat(),loadReads()]); } finally{ syncing=false; }
+}
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&Date.now()-lastSync>2000) syncNow(); });
+window.addEventListener("online",syncNow);
+window.addEventListener("pageshow",e=>{ if(e.persisted) syncNow(); });
+setInterval(()=>{ if(document.visibilityState==="visible"&&Date.now()-lastSync>12000) syncNow(); },15000);
 
 /* ============ EINFÜHRUNG für neue Nutzer ============ */
 function tourSteps(){
