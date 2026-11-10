@@ -96,3 +96,18 @@ drop policy if exists "Chat löschen" on public.messages;
 create policy "Chat löschen" on public.messages for delete to authenticated
   using (user_id = auth.uid() or (is_admin() and recipient_id is null));
 create index if not exists messages_created_idx on public.messages (created_at desc);
+
+-- Lesebestätigungen: bis wann hat wer welche Unterhaltung gelesen
+-- conv = 'team' oder die Profil-ID des Gegenübers im Einzelchat
+create table if not exists public.chat_reads (
+  user_id uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  conv text not null,
+  read_at timestamptz not null,
+  primary key (user_id, conv)
+);
+alter table public.chat_reads enable row level security;
+create policy "Gelesen sehen"  on public.chat_reads for select to authenticated
+  using (is_member() and (conv = 'team' or user_id = auth.uid() or conv = auth.uid()::text));
+create policy "Gelesen setzen" on public.chat_reads for insert to authenticated with check (is_member() and user_id = auth.uid());
+create policy "Gelesen ändern" on public.chat_reads for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+alter publication supabase_realtime add table public.chat_reads;

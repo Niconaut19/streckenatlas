@@ -308,7 +308,8 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .msg.mine{align-self:flex-end;background:var(--red);color:#fff;border-radius:16px 16px 5px 16px}
 .msg .who{display:block;font-size:12px;font-weight:700;color:var(--red);margin-bottom:1px}
 .msg .txt{white-space:pre-wrap;line-height:1.4}
-.msg time{display:block;text-align:right;font-size:10.5px;opacity:.65;margin-top:2px;font-variant-numeric:tabular-nums}
+.msg time{display:block;text-align:right;font-size:10.5px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
+.msg.mine time{color:rgba(255,255,255,.8)}
 .msg.first{margin-top:6px}
 .msg .locbtn{display:flex;align-items:center;gap:6px;border:0;border-radius:10px;padding:7px 10px;margin:2px 0;font-weight:700;cursor:pointer;background:rgba(0,0,0,.08);color:inherit}
 .msg.mine .locbtn{background:rgba(255,255,255,.2)}
@@ -316,6 +317,17 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .msgact{flex:none;display:none;align-self:flex-start;gap:6px;margin:2px 0 6px}
 .msgact.mine{align-self:flex-end}
 .msgact.on{display:flex}
+.tick{display:inline-flex;vertical-align:-2px;margin-left:4px}
+.tick svg{height:11px;width:auto;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tick.pending svg{height:11px;stroke-width:1.5}
+.tick.read{color:#8fe3ff}
+.tick.read svg{stroke-width:2.3;height:12px}
+.msg:not(.mine) .tick{display:none}
+.msg time{display:flex;justify-content:flex-end;align-items:center}
+.msgact{flex-direction:column;align-items:flex-start;gap:6px}
+.msgact.mine{align-items:flex-end}
+.msgact .actbtns{display:flex;gap:6px}
+.readinfo{font-size:12px;color:var(--muted);max-width:280px;text-align:right}
 .msgact button{border:0;border-radius:999px;padding:7px 14px;font-weight:700;font-size:13px;cursor:pointer;background:var(--grey-1);color:var(--ink)}
 .msgact .delbtn{background:var(--red-soft);color:var(--red)}
 .msgact .delbtn.armed{background:var(--red);color:#fff}
@@ -726,10 +738,14 @@ function supabaseBackend(){
     async listMessages(){const {data,error}=await sb.from("messages").select("*").order("created_at",{ascending:false}).limit(500);
       if(error) throw new Error(/messages/.test(error.message)&&/exist|schema cache/.test(error.message)?"Der Chat ist noch nicht eingerichtet (SQL in Supabase ausführen).":error.message);
       return data.reverse();},
-    async sendMessage(m){const {error}=await sb.from("messages").insert(m);
-      if(error) throw new Error(/recipient_id/.test(error.message)?"Für Direktnachrichten bitte zuerst das SQL in Supabase ausführen.":error.message);},
+    async sendMessage(m){const {data,error}=await sb.from("messages").insert(m).select().single();
+      if(error) throw new Error(/recipient_id/.test(error.message)?"Für Direktnachrichten bitte zuerst das SQL in Supabase ausführen.":error.message); return data;},
     async deleteMessage(id){const {error,count}=await sb.from("messages").delete({count:"exact"}).eq("id",id); if(error) throw error; if(!count) throw new Error("Keine Berechtigung");},
-    subscribeMessages(cb){sb.channel("messages").on("postgres_changes",{event:"*",schema:"public",table:"messages"},cb).subscribe();}
+    subscribeMessages(cb){sb.channel("messages").on("postgres_changes",{event:"*",schema:"public",table:"messages"},cb).subscribe();},
+    async listReads(){const {data,error}=await sb.from("chat_reads").select("*"); return error?[]:data;},
+    async setRead(conv,read_at){const {data:{session}}=await sb.auth.getSession(); if(!session) return;
+      const {error}=await sb.from("chat_reads").upsert({user_id:session.user.id,conv,read_at},{onConflict:"user_id,conv"}); if(error) console.warn("Lesebestätigung:",error.message);},
+    subscribeReads(cb){sb.channel("chat_reads").on("postgres_changes",{event:"*",schema:"public",table:"chat_reads"},cb).subscribe();}
   };
 }
 function demoBackend(){
@@ -757,10 +773,13 @@ function demoBackend(){
     async setRole(id,role){users.find(u=>u.id===id).role=role;saveUsers();},
     subscribe(){},
     async listMessages(){return store.get("sa_demo_msgs",[]);},
-    async sendMessage(m){const a=store.get("sa_demo_msgs",[]);a.push({...m,id:crypto.randomUUID(),user_id:current,created_at:new Date().toISOString()});store.set("sa_demo_msgs",a.slice(-200));},
+    async sendMessage(m){const a=store.get("sa_demo_msgs",[]);const row={...m,id:crypto.randomUUID(),user_id:current,created_at:new Date().toISOString()};a.push(row);store.set("sa_demo_msgs",a.slice(-200));return row;},
     async deleteMessage(id){const u=users.find(x=>x.id===current);const a=store.get("sa_demo_msgs",[]);const m=a.find(x=>x.id===id);
       if(m&&m.user_id!==current&&u.role!=="admin") throw new Error("Keine Berechtigung"); store.set("sa_demo_msgs",a.filter(x=>x.id!==id));},
-    subscribeMessages(){}
+    subscribeMessages(){},
+    async listReads(){return store.get("sa_demo_reads",[]);},
+    async setRead(conv,read_at){const a=store.get("sa_demo_reads",[]).filter(r=>!(r.user_id===current&&r.conv===conv));a.push({user_id:current,conv,read_at});store.set("sa_demo_reads",a);},
+    subscribeReads(){}
   };
 }
 const api = CONFIG.SUPABASE_URL ? supabaseBackend() : demoBackend();
@@ -1764,11 +1783,37 @@ function updateChatBadge(){
   const convs=new Set(chatMsgs.map(convOf)); let n=0; convs.forEach(c=>n+=unreadIn(c));
   $("#chatBadge").hidden=!n; $("#chatBadge").textContent=n>99?"99+":n;
 }
-function markRead(c){const ms=chatMsgs.filter(m=>convOf(m)===c); if(ms.length) store.set(readKey(c),ms[ms.length-1].created_at); updateChatBadge();}
+/* Lesebestätigungen: wer hat welche Unterhaltung bis wann gelesen */
+let reads={};                       // "userId|conv" -> read_at
+const pushedRead={};
+function markRead(c){
+  const ms=chatMsgs.filter(m=>convOf(m)===c&&!m._pending); if(!ms.length){updateChatBadge();return;}
+  const lastAt=ms[ms.length-1].created_at; store.set(readKey(c),lastAt); updateChatBadge();
+  if(document.visibilityState!=="visible") return;
+  const serverConv=c===TEAM?TEAM:c;          // bei Einzelchats: ID des Gegenübers
+  if(!(pushedRead[c]>=lastAt)){ pushedRead[c]=lastAt; reads[me.id+"|"+serverConv]=lastAt; api.setRead(serverConv,lastAt); }
+}
+async function loadReads(){ try{ reads={}; (await api.listReads()).forEach(r=>{reads[r.user_id+"|"+r.conv]=r.read_at;}); if(chatOpen&&chatConv) renderChat(); }catch{} }
+function onReadChange(p){ const r=p.new; if(!r||!r.user_id) return; reads[r.user_id+"|"+r.conv]=r.read_at; if(chatOpen) chatConv?renderChat():renderConvs(); }
+/* Für eigene Nachrichten: wer hat gelesen? */
+function readersOf(m){
+  if(m.recipient_id){ const at=reads[m.recipient_id+"|"+me.id]; return {all:!!at&&at>=m.created_at,names:[]}; }
+  const others=colleagues(); const who=others.filter(p=>{const at=reads[p.id+"|"+TEAM];return at&&at>=m.created_at;});
+  return {all:others.length>0&&who.length===others.length,names:who.map(p=>p.name||p.email),total:others.length};
+}
+const TICK1='<svg viewBox="0 0 18 12"><path d="M1.5 6.5 5 10l7.5-8"/></svg>';
+const TICK2='<svg viewBox="0 0 22 12"><path d="M1.5 6.5 5 10l7.5-8M9 9.2l.8.8 7.5-8"/></svg>';
+const CLOCK='<svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.5"/><path d="M7 4v3.2l2 1.3"/></svg>';
+function tickFor(m){
+  if(m._pending) return `<span class="tick pending" title="Wird gesendet">${CLOCK}</span>`;
+  const r=readersOf(m);
+  return r.all?`<span class="tick read" title="Gelesen">${TICK2}</span>`:`<span class="tick" title="Gesendet">${TICK1}</span>`;
+}
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&chatOpen&&chatConv) markRead(chatConv); });
 
 /* Übersicht: Team oben, dann Kollegen nach letzter Nachricht */
 function colleagues(){return Object.values(profiles).filter(p=>p.id!==me?.id&&p.role!=="wartend");}
-function preview(m){ if(!m) return ""; const who=m.user_id===me?.id?"Du: ":(convOf(m)===TEAM?nameOf(m.user_id).split(" ")[0]+": ":""); return who+(m.body||"Standort geteilt"); }
+function preview(m){ if(!m) return ""; const who=m.user_id===me?.id?(readersOf(m).all?"✓✓ Du: ":"✓ Du: "):(convOf(m)===TEAM?nameOf(m.user_id).split(" ")[0]+": ":""); return who+(m.body||"Standort geteilt"); }
 function renderConvs(){
   const last={}; chatMsgs.forEach(m=>{last[convOf(m)]=m;});
   const q=norm($("#chatSearch").value.trim());
@@ -1805,7 +1850,7 @@ function renderChat(){
   const ms=chatMsgs.filter(m=>convOf(m)===chatConv);
   if(!ms.length){el.innerHTML=`<p class="chatempty">${chatConv===TEAM?"Noch keine Nachrichten im Team. Schreib als Erstes etwas.":"Noch keine Nachrichten. Diese Unterhaltung sehen nur ihr beide."}</p>`;return;}
   const canDelAny=ms.some(m=>m.user_id===me?.id||(me?.role==="admin"&&!m.recipient_id));
-  let html=(canDelAny&&!store.get("sa_chat_tip",false))?'<div class="chattip">Tipp: Eigene Nachricht antippen, um sie zu löschen</div>':"";
+  let html=(canDelAny&&!store.get("sa_chat_tip",false))?'<div class="chattip">Tipp: Eigene Nachricht antippen für Lesestatus und Löschen</div>':"";
   let lastDay="", lastUser="", lastT=0;
   for(const m of ms){
     const day=dayLabel(m.created_at); if(day!==lastDay){html+=`<div class="chatday">${esc(day)}</div>`;lastDay=day;lastUser="";}
@@ -1814,8 +1859,14 @@ function renderChat(){
     const who=!mine&&first&&chatConv===TEAM?`<span class="who">${esc(nameOf(m.user_id))}</span>`:"";
     const loc=m.lat!=null?`<button type="button" class="locbtn" data-lat="${m.lat}" data-lng="${m.lng}"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>Standort auf Karte zeigen</button>`:"";
     const canDel=mine||(me?.role==="admin"&&!m.recipient_id);
-    html+=`<div class="msg${mine?" mine":""}${first?" first":""}${selMsg===m.id?" sel":""}" data-id="${esc(m.id)}" data-can="${canDel?1:0}">${who}${m.body?`<span class="txt">${esc(m.body)}</span>`:""}${loc}<time>${fmtTime(m.created_at)}</time></div>`;
-    if(canDel) html+=`<div class="msgact${mine?" mine":""}${selMsg===m.id?" on":""}" data-for="${esc(m.id)}"><button type="button" class="delbtn" data-del="${esc(m.id)}">Löschen</button><button type="button" data-cancel="1">Abbrechen</button></div>`;
+    html+=`<div class="msg${mine?" mine":""}${first?" first":""}${selMsg===m.id?" sel":""}" data-id="${esc(m.id)}" data-can="${canDel?1:0}">${who}${m.body?`<span class="txt">${esc(m.body)}</span>`:""}${loc}<time>${fmtTime(m.created_at)}${mine?tickFor(m):""}</time></div>`;
+    if(canDel){
+      let info="";
+      if(mine&&!m._pending){ const r=readersOf(m);
+        info=m.recipient_id?(r.all?"Gelesen":"Gesendet, noch nicht gelesen")
+          :(r.total?(r.names.length?`Gelesen von ${r.names.length} von ${r.total}: ${r.names.join(", ")}`:`Noch von niemandem gelesen (0 von ${r.total})`):"Gesendet"); }
+      html+=`<div class="msgact${mine?" mine":""}${selMsg===m.id?" on":""}" data-for="${esc(m.id)}">${info?`<span class="readinfo">${esc(info)}</span>`:""}<span class="actbtns"><button type="button" class="delbtn" data-del="${esc(m.id)}">Löschen</button><button type="button" data-cancel="1">Abbrechen</button></span></div>`;
+    }
   }
   const atBottom=el.scrollHeight-el.scrollTop-el.clientHeight<80;
   el.innerHTML=html;
@@ -1842,13 +1893,20 @@ chatInput.addEventListener("input",autoGrow); autoGrow();
 chatInput.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&!/iPhone|iPad|Android/.test(navigator.userAgent)){e.preventDefault();$("#chatForm").requestSubmit();}});
 async function sendChat(m){
   if(chatConv&&chatConv!==TEAM) m.recipient_id=chatConv;
-  try{ await api.sendMessage(m); vibrate(10); if(api.demo) await loadChat(); }
-  catch(e){ toast("Senden fehlgeschlagen: "+(e.message||"")); throw e; }
+  const tmp={...m,id:"tmp-"+Date.now(),user_id:me.id,created_at:new Date().toISOString(),_pending:true};
+  chatMsgs.push(tmp); renderChat(); $("#chatList").scrollTop=$("#chatList").scrollHeight;
+  try{
+    const row=await api.sendMessage(m); vibrate(10);
+    chatMsgs=chatMsgs.filter(x=>x!==tmp);
+    if(row&&!chatMsgs.some(x=>x.id===row.id)) chatMsgs.push(row);
+    chatMsgs.sort((a,b)=>a.created_at<b.created_at?-1:1); renderChat(); if(chatConv) markRead(chatConv);
+  }catch(e){ chatMsgs=chatMsgs.filter(x=>x!==tmp); renderChat(); toast("Senden fehlgeschlagen: "+(e.message||"")); throw e; }
 }
 $("#chatForm").onsubmit=async e=>{
   e.preventDefault(); const body=chatInput.value.trim(); if(!body) return;
   $("#chatSend").disabled=true;
-  try{ await sendChat({body}); chatInput.value=""; autoGrow(); }catch{ $("#chatSend").disabled=false; }
+  chatInput.value=""; autoGrow();
+  try{ await sendChat({body}); }catch{ chatInput.value=body; autoGrow(); }
 };
 $("#chatLoc").onclick=()=>{
   const send=ll=>sendChat({body:null,lat:ll[1],lng:ll[0]}).then(()=>toast("Standort gesendet")).catch(()=>{});
@@ -1903,7 +1961,7 @@ function onChatChange(payload){
     const m=payload.new; if(!visible(m)||chatMsgs.some(x=>x.id===m.id)) return;
     chatMsgs.push(m); if(chatMsgs.length>600) chatMsgs.shift();
     const c=convOf(m);
-    if(chatOpen&&chatConv===c){ renderChat(); markRead(c); }
+    if(chatOpen&&chatConv===c){ renderChat(); markRead(c); }   // markRead prüft, ob die App sichtbar ist
     else { updateChatBadge(); if(chatOpen&&!chatConv) renderConvs();
       if(m.user_id!==me?.id){ toast(c===TEAM?`Neue Nachricht im Team von ${nameOf(m.user_id)}`:`${nameOf(m.user_id)} schreibt dir`); vibrate([30,40,30]); } }
   } else if(payload.eventType==="DELETE"){
@@ -2037,7 +2095,8 @@ async function start(){
   $("#userName").textContent=me.name; $("#userAvatar").textContent=(me.name||"?")[0].toUpperCase();
   $("#userRole").textContent=me.role==="admin"?"Admin":"Mitarbeiter"; $("#userRole").className=me.role==="admin"?"admin":"";
   await refreshMarkers();
-  if(!subscribed){api.subscribe(()=>refreshMarkers());api.subscribeMessages(onChatChange);subscribed=true;}
+  if(!subscribed){api.subscribe(()=>refreshMarkers());api.subscribeMessages(onChatChange);api.subscribeReads(onReadChange);subscribed=true;}
+  loadReads();
   loadChat();
   if(api.demo && !store.get("sa_demo_seen",false)){store.set("sa_demo_seen",true);toast("Demo-Modus: Daten bleiben nur auf diesem Gerät");}
   if(!store.get(tourKey(),false)) setTimeout(startTour,700);
