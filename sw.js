@@ -1,5 +1,5 @@
 /* Service Worker: App offline verfügbar machen, Kartenteile speichern, Mitteilungen öffnen */
-const SHELL = "sa-shell-v1";        // App-Dateien und Bibliotheken
+const SHELL = "sa-shell-v2";        // App-Dateien und Bibliotheken
 const DATA = "sa-data-v1";          // Strecken-, Bahnanlagen- und Kilometerdaten
 const SAVED = "sa-tiles-saved";     // gezielt für offline gespeicherte Kartenteile (bleiben)
 const RUNTIME = "sa-tiles-rt";      // beim Anschauen gemerkte Kartenteile (werden begrenzt)
@@ -20,7 +20,10 @@ self.addEventListener("install", e => {
     await self.skipWaiting();
   })());
 });
-self.addEventListener("activate", e => e.waitUntil(self.clients.claim()));
+self.addEventListener("activate", e => e.waitUntil((async () => {
+  for (const k of await caches.keys()) if (k.startsWith("sa-shell-") && k !== SHELL) await caches.delete(k);
+  await self.clients.claim();
+})()));
 
 /* Luftbild Bayern kommt als WMS mit Koordinaten-Ausschnitt. Für den Speicher wird daraus
    ein fester Schlüssel z/x/y, damit gespeicherte und angezeigte Teile sicher zusammenpassen. */
@@ -62,7 +65,8 @@ async function tileFetch(req, key) {
 async function networkFirst(req, cacheName, timeoutMs, matchOpts) {
   const c = await caches.open(cacheName);
   try {
-    const res = await Promise.race([fetch(req), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), timeoutMs))]);
+    // cache: "no-cache" = immer beim Server nachfragen, ob es eine neuere Fassung gibt
+    const res = await Promise.race([fetch(req, { cache: "no-cache" }), new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), timeoutMs))]);
     if (res.ok) c.put(req, res.clone());
     return res;
   } catch (err) {

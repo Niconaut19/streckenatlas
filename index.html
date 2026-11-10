@@ -2313,7 +2313,12 @@ $("#nbSys").onchange=async e=>{
   saveNb();
 };
 let swReg=null;
-if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").then(r=>swReg=r).catch(()=>{});}
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(r=>{swReg=r; r.update().catch(()=>{});}).catch(()=>{});
+  /* Wird ein neuer Hintergrund-Dienst aktiv, einmal neu laden, damit die neue Fassung sichtbar ist */
+  let swReloaded=false;
+  navigator.serviceWorker.addEventListener("controllerchange",()=>{ if(swReloaded||!navigator.serviceWorker.controller) return; swReloaded=true; if(!sessionStorage.getItem("sa_sw_reload")){ try{sessionStorage.setItem("sa_sw_reload","1")}catch{} location.reload(); } });
+}
 
 function distM(a,b){const k=111320,kx=k*Math.cos(a[1]*Math.PI/180);return Math.hypot((a[0]-b[0])*kx,(a[1]-b[1])*k);}
 let nbCurrent=null, nbLastCheck=0;
