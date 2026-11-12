@@ -357,7 +357,9 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .chatloc{background:var(--grey-1);color:var(--ink)}
 .chatsend svg,.chatloc svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
 .updbar{position:fixed;z-index:65;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 64px);border:0;cursor:pointer;
-  background:var(--red);color:#fff;font:600 14px var(--sans);padding:10px 16px;border-radius:999px;box-shadow:var(--shadow);white-space:nowrap;animation:slidein .35s var(--ease)}
+  background:var(--red);color:#fff;font:600 14px var(--sans);padding:6px 6px 6px 16px;border-radius:999px;box-shadow:var(--shadow);white-space:nowrap;animation:slidein .35s var(--ease);display:flex;align-items:center;gap:8px}
+.updbar[hidden]{display:none}
+#updX{border:0;background:rgba(255,255,255,.2);color:#fff;width:28px;height:28px;border-radius:50%;font-size:18px;line-height:1;cursor:pointer}
 .offpill{position:fixed;z-index:21;left:max(10px,env(safe-area-inset-left,0px));top:calc(env(safe-area-inset-top,0px) + 64px);
   display:flex;align-items:center;gap:7px;background:var(--inv-bg);color:var(--inv-fg);font-size:12.5px;font-weight:700;padding:6px 12px;border-radius:999px;box-shadow:var(--shadow)}
 .offpill .dot{width:8px;height:8px;border-radius:50%;background:#f59f00}
@@ -761,7 +763,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
   <button class="x" type="button" id="nbClose" aria-label="Hinweis schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
 </div>
 
-<button class="updbar" id="updBar" hidden type="button">Neue Version verfügbar · <b>Jetzt aktualisieren</b></button>
+<div class="updbar" id="updBar" hidden role="button" tabindex="0"><span>Neue Version · <b>Jetzt aktualisieren</b></span><button type="button" id="updX" aria-label="Später">×</button></div>
 
 <div class="offpill" id="offPill" hidden><span class="dot"></span><span id="offPillTxt">Offline</span></div>
 
@@ -1099,28 +1101,32 @@ map.on("load",()=>applyTheme(store.get("sa_theme","light")));
 document.querySelectorAll("input[name=theme]").forEach(r=>r.onchange=e=>{store.set("sa_theme",e.target.value);applyTheme(e.target.value);});
 matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",()=>{if(store.get("sa_theme","light")==="auto")applyTheme("auto");});
 
-/* Neue Version erkennen: Stand der Seite auf dem Server mit dem geladenen vergleichen */
-let loadedStand=null;
-async function serverStand(){
-  try{const r=await fetch(location.pathname+"?check="+Date.now(),{method:"HEAD",cache:"no-store"}); return r.headers.get("last-modified")||r.headers.get("etag");}catch{return null;}
+/* Neue Version erkennen: eigene Version mit version.json auf dem Server vergleichen.
+   Die Version ändert sich nur, wenn sich die App wirklich geändert hat (nicht bei Daten-Updates). */
+const APP_VERSION="86be7747c9", APP_DATE="2026-11-12T15:58:09Z";
+async function serverVersion(){
+  try{ const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); if(!r.ok) return null; return (await r.json()).v||null; }catch{ return null; }
 }
-(async()=>{
-  loadedStand=await serverStand();
-  if(loadedStand){const d=new Date(loadedStand); $("#appStand").textContent=isNaN(d)?"":"Stand der App: "+d.toLocaleString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})+" Uhr";}
-})();
-async function checkUpdate(){
-  if(!loadedStand||!$("#updBar").hidden) return;
-  const now=await serverStand(); if(now&&now!==loadedStand) $("#updBar").hidden=false;
+if(APP_DATE){ const d=new Date(APP_DATE); $("#appStand").textContent="Stand der App: "+d.toLocaleString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})+" Uhr"; }
+let updDismissed=false; const startedAt=Date.now();
+async function checkUpdate(manual){
+  if(!APP_VERSION||(!manual&&(updDismissed||!$("#updBar").hidden||Date.now()-startedAt<60000))) return null;
+  const v=await serverVersion(); const newer=!!v&&v!==APP_VERSION;
+  if(newer&&!updDismissed) $("#updBar").hidden=false;
+  return newer;
 }
-setInterval(checkUpdate,3*60*1000);
-document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible") checkUpdate();});
+setInterval(()=>checkUpdate(false),10*60*1000);
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible") checkUpdate(false);});
 $("#btnCheckUpd").onclick=async()=>{
   toast("Suche nach neuer Version …");
-  const now=await serverStand();
-  if(now&&loadedStand&&now!==loadedStand){ $("#updBar").hidden=false; closeSheets(); }
-  else toast("Du hast schon die neueste Version");
+  updDismissed=false;
+  const r=await checkUpdate(true);
+  if(r){ $("#updBar").hidden=false; closeSheets(); } else if(r===false) toast("Du hast schon die neueste Version"); else toast("Konnte gerade nicht prüfen. Bist du online?");
 };
-$("#updBar").onclick=()=>{$("#updBar").innerHTML="Wird aktualisiert …";location.replace(location.pathname+"?v="+Date.now());};
+$("#updBar").onclick=e=>{
+  if(e.target.closest("#updX")){ updDismissed=true; $("#updBar").hidden=true; return; }
+  $("#updBar").firstElementChild.textContent="Wird aktualisiert …"; location.replace(location.pathname+"?v="+Date.now());
+};
 
 /* Aufklappbare Bereiche merken */
 const folds=store.get("sa_folds",{});

@@ -92,6 +92,7 @@ self.addEventListener("fetch", e => {
   if (key) { e.respondWith(tileFetch(req, key)); return; }
 
   if (url.origin === self.location.origin) {
+    if (url.pathname.endsWith("/version.json")) return;                  // Versionsprüfung immer live
     if (req.mode === "navigate" || url.pathname.endsWith("/") || url.pathname.endsWith("/index.html")) {
       // App-Seite: zuerst aus dem Netz (damit Updates ankommen), ohne Netz die gespeicherte
       e.respondWith(networkFirst(new Request("./", { credentials: "same-origin" }), SHELL, 5000, { ignoreSearch: true })
