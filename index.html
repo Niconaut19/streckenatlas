@@ -802,16 +802,27 @@ let toastT; function toast(msg){const t=$("#toast");t.textContent=msg;t.classLis
 const store = { get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}}, set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}} };
 const vibrate = ms => { try{navigator.vibrate&&navigator.vibrate(ms)}catch{} };   // nur Android, iPhone erlaubt das Web-Apps nicht
 /* Benachrichtigungston: wird erzeugt, keine Datei nötig. iPhones erlauben Töne erst nach dem ersten Antippen der App. */
-let audioCtx=null;
-try{ if(navigator.audioSession) navigator.audioSession.type="ambient"; }catch{}   // Lautlos-Schalter respektieren
-function unlockAudio(){
+/* Ton für Chat-Nachrichten, so gebaut, dass Radio, Musik oder Navigation weiterlaufen:
+   - Audio-Art "ambient": mischt sich unter andere Wiedergabe und hält sich an den Lautlos-Schalter
+   - Ton wird nur vorbereitet, wenn er in den Einstellungen an ist
+   - zwischen den Tönen ist die Audio-Ausgabe pausiert und belegt nichts */
+let audioCtx=null, audioReady=false, audioIdle=null;
+function setAmbient(){ try{ if(navigator.audioSession&&navigator.audioSession.type!=="ambient") navigator.audioSession.type="ambient"; }catch{} }
+setAmbient();
+function soundWanted(){ return typeof cn!=="undefined"&&cn.sound; }
+function unlockAudio(force){
+  if(audioReady||!(force||soundWanted())) return;
   try{
-    if(!audioCtx){ const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return; audioCtx=new AC(); }
-    if(audioCtx.state==="suspended") audioCtx.resume();
-    const b=audioCtx.createBuffer(1,1,22050), src=audioCtx.createBufferSource(); src.buffer=b; src.connect(audioCtx.destination); src.start(0);
+    setAmbient();
+    const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
+    if(!audioCtx) audioCtx=new AC();
+    audioCtx.resume().then(()=>{ audioReady=true; audioCtx.suspend().catch(()=>{}); stopUnlockListeners(); }).catch(()=>{});
   }catch{}
 }
-["pointerdown","touchend","keydown"].forEach(t=>document.addEventListener(t,unlockAudio,{passive:true}));
+const unlockEvents=["pointerdown","keydown"];
+const onFirstTouch=()=>unlockAudio(false);
+unlockEvents.forEach(t=>document.addEventListener(t,onFirstTouch,{passive:true}));
+function stopUnlockListeners(){ unlockEvents.forEach(t=>document.removeEventListener(t,onFirstTouch)); }
 /* Eigene Töne (selbst erzeugt). Jede Note: [Frequenz, Start, Dauer, Lautstärke, Wellenform] */
 const TONES={
   ding:   {label:"Ding",       notes:[[880,0,.14,.22,"sine"],[1319,.11,.26,.22,"sine"]]},
@@ -821,9 +832,13 @@ const TONES={
   dreik:  {label:"Dreiklang",  notes:[[784,0,.12,.18,"sine"],[988,.09,.12,.18,"sine"],[1175,.18,.3,.18,"sine"]]},
   kurz:   {label:"Kurz & leise",notes:[[988,0,.09,.12,"sine"]]}
 };
-function playTone(kind){
+async function playTone(kind){
   try{
-    if(!audioCtx||audioCtx.state!=="running") return false;
+    if(!audioCtx) return false;
+    setAmbient();
+    if(audioCtx.state!=="running") await audioCtx.resume();
+    if(audioCtx.state!=="running") return false;
+    clearTimeout(audioIdle); audioIdle=setTimeout(()=>{ audioCtx.suspend().catch(()=>{}); },1800);
     const name=kind==="soft"?"kurz":(kind||((typeof cn!=="undefined"&&cn.tone)||"ding"));
     const t=TONES[name]||TONES.ding, t0=audioCtx.currentTime;
     for(const [f,start,len,vol,wave,fEnd] of t.notes){
@@ -2176,10 +2191,10 @@ function onChatChange(payload){
 
 /* ============ NACHRICHTEN-BANNER (wie bei WhatsApp) ============ */
 const cn=Object.assign({banner:true,sys:false,sound:true,tone:"ding"},store.get("sa_chatnotify",{}));
-$("#cnSound").checked=cn.sound; $("#cnSound").onchange=e=>{cn.sound=e.target.checked;store.set("sa_chatnotify",cn); if(cn.sound) playTone();};
+$("#cnSound").checked=cn.sound; $("#cnSound").onchange=e=>{cn.sound=e.target.checked;store.set("sa_chatnotify",cn); if(cn.sound){ unlockAudio(true); setTimeout(()=>playTone(),80);} else if(audioCtx){ audioCtx.suspend().catch(()=>{}); } };
 $("#cnTone").innerHTML=Object.entries(TONES).filter(([k])=>k!=="kurz").map(([k,t])=>`<option value="${k}">${t.label}</option>`).join("");
 $("#cnTone").value=cn.tone||"ding";
-$("#cnTone").onchange=e=>{ cn.tone=e.target.value; store.set("sa_chatnotify",cn); unlockAudio(); setTimeout(()=>{ if(!playTone(cn.tone)) toast("Ton konnte nicht abgespielt werden. Ist das Handy laut gestellt?"); },60); };
+$("#cnTone").onchange=e=>{ cn.tone=e.target.value; store.set("sa_chatnotify",cn); unlockAudio(true); setTimeout(async()=>{ if(!(await playTone(cn.tone))) toast("Ton konnte nicht abgespielt werden. Ist das Handy laut gestellt?"); },80); };
 $("#cnBanner").checked=cn.banner; $("#cnSys").checked=cn.sys; $("#cnSysRow").hidden=!("Notification" in window);
 $("#cnBanner").onchange=e=>{cn.banner=e.target.checked;store.set("sa_chatnotify",cn);};
 $("#cnSys").onchange=async e=>{
