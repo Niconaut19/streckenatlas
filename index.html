@@ -404,6 +404,40 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .offhead .lbl small{display:block;font-size:12.5px;color:var(--muted)}
 .offbtns{display:grid;grid-template-columns:2fr 1fr;gap:8px}
 .offcard .linkbtn{align-self:flex-start;padding:0;font-size:13px}
+.sigicon{width:34px;height:34px;border-radius:9px;background:var(--red);display:grid;place-items:center;flex:none}
+.sigicon svg{width:20px;height:20px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.sheet.sigsheet{height:92%}
+@media (min-width:760px){.sheet.sigsheet{height:auto;width:460px}}
+.sigtop{display:flex;flex-direction:column;gap:10px;padding:0 16px 10px;border-bottom:1px solid var(--grey-1)}
+.sigcats{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px}
+.sigcats::-webkit-scrollbar{display:none}
+.sigcats button{flex:none;border:1.5px solid var(--grey-2);background:var(--white);color:var(--ink-2);border-radius:999px;padding:6px 12px;font:600 13px var(--sans);cursor:pointer}
+.sigcats button.on{background:var(--ink);border-color:var(--ink);color:var(--white)}
+.sigbody{padding-top:14px}
+.siggrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.sigcard{border:1px solid var(--grey-2);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--white)}
+.sigcard .art{height:118px;display:grid;place-items:center;background:linear-gradient(180deg,#9bb7c9,#c9d8c2);border-radius:9px}
+.sigcard .art svg{height:104px;width:auto;max-width:100%}
+.sigcard b{font-size:15px}
+.sigcard .nm{font-weight:700;font-size:13.5px;color:var(--ink);overflow-wrap:anywhere;hyphens:auto}
+.sigcard>div:nth-child(2){min-width:0}
+.sigcard p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.4}
+.sigcode{display:inline-block;background:var(--red);color:#fff;font-weight:800;font-size:12px;padding:2px 8px;border-radius:6px;margin-right:6px}
+.signote{font-size:12px;color:var(--muted);margin:14px 2px 4px}
+.blink{animation:sigblink 1s steps(1) infinite}
+@keyframes sigblink{50%{opacity:.08}}
+@media (prefers-reduced-motion:reduce){.blink{animation:none}}
+.quiz{display:flex;flex-direction:column;gap:12px}
+.quiz .art{height:170px;display:grid;place-items:center;background:linear-gradient(180deg,#9bb7c9,#c9d8c2);border-radius:var(--r)}
+.quiz .art svg{height:150px;width:auto}
+.quiz .q{font-weight:700;font-size:16px;text-align:center}
+.qopts{display:grid;gap:8px}
+.qopts button{border:1.5px solid var(--grey-2);background:var(--white);color:var(--ink);border-radius:12px;padding:12px 14px;text-align:left;font:600 14.5px var(--sans);cursor:pointer}
+.qopts button.right{border-color:#2f9e44;background:#2f9e4422}
+.qopts button.wrong{border-color:var(--red);background:var(--red-soft)}
+.qfoot{display:flex;justify-content:space-between;align-items:center}
+.qscore{font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.qexplain{font-size:13.5px;color:var(--ink-2);background:var(--grey-1);border-radius:10px;padding:10px 12px}
 .toast{position:fixed;z-index:60;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);
   transform:translate(-50%,20px);opacity:0;transition:all .3s var(--ease);pointer-events:none;
   background:var(--inv-bg);color:var(--inv-fg);padding:12px 18px;border-radius:12px;font-weight:600;max-width:calc(100% - 110px);text-align:center;box-shadow:var(--shadow)}
@@ -576,11 +610,28 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
   </form>
 </section>
 
+<!-- Signalbuch -->
+<section class="sheet sigsheet" id="sheetSig" aria-label="Signalbuch">
+  <div class="grab"></div>
+  <header><button class="backbtn" id="sigBack" aria-label="Zurück zu den Einstellungen"><svg viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></svg></button><h2 id="sigTitle">Signalbuch</h2><button class="x" data-close aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+  <div class="sigtop">
+    <div class="seg" id="sigMode"><label><input type="radio" name="sigmode" value="view" id="sigView" checked>Ansehen</label><label><input type="radio" name="sigmode" value="quiz" id="sigQuiz">Üben</label></div>
+    <div class="sigcats" id="sigCats"></div>
+  </div>
+  <div class="body sigbody" id="sigBody"></div>
+</section>
+
 <!-- Einstellungen -->
 <section class="sheet" id="sheetSettings" aria-label="Einstellungen">
   <div class="grab"></div>
   <header><h2>Einstellungen</h2><button class="x" data-close aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
   <div class="body setbody">
+    <div class="group"><h3>Lernen</h3>
+      <div class="list">
+        <button type="button" class="opt setrow" id="btnSig"><span class="sigicon"><svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="15" rx="3"/><circle cx="12" cy="6.5" r="1.8"/><circle cx="12" cy="11.5" r="1.8"/><path d="M12 17.5V22M8.5 22h7"/></svg></span><span class="lbl">Signalbuch<br><small>Signale ansehen und üben</small></span><svg class="rchev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>
+      </div>
+    </div>
+
     <div class="group"><h3>Darstellung</h3>
       <div class="seg" id="themeSeg">
         <label><input type="radio" name="theme" value="light" id="thLight">Hell</label>
@@ -1116,7 +1167,7 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",()=>{if(s
 
 /* Neue Version erkennen: eigene Version mit version.json auf dem Server vergleichen.
    Die Version ändert sich nur, wenn sich die App wirklich geändert hat (nicht bei Daten-Updates). */
-const APP_VERSION="ae0d6c5dfe", APP_DATE="2026-11-13T16:32:09Z";
+const APP_VERSION="631f849c9b", APP_DATE="2026-11-13T16:40:56Z";
 async function serverVersion(){
   try{ const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); if(!r.ok) return null; return (await r.json()).v||null; }catch{ return null; }
 }
@@ -2446,6 +2497,97 @@ async function runOfflineView(){ await runOffline("view"); }
 $("#offStop").onclick=()=>{ if(offAbort) offAbort.stop=true; };
 $("#offClear").onclick=async()=>{ if(!(await ask("Gespeicherte Karten löschen?","Luftbild und Straßennamen für offline werden vom Handy entfernt. Strecken und Objekte bleiben.","Löschen"))) return; await caches.delete(SAVED_CACHE); updateOffInfo(); toast("Offline-Karten gelöscht"); };
 updateOffInfo();
+
+/* ============ SIGNALBUCH (Lernhilfe) ============
+   Auswahl gängiger Signale nach Eisenbahn-Signalordnung. Zeichnungen schematisch. */
+const SIGC={red:"#ff2a1f",green:"#22e05a",yellow:"#ffc21a",white:"#f4f7ff",off:"#2b2f36"};
+function lamp(x,y,c,r=7,blink){ const col=SIGC[c]||c, lit=c!=="off";
+  return `<circle cx="${x}" cy="${y}" r="${r+2.5}" fill="#111"/>${lit?`<circle class="${blink?"blink":""}" cx="${x}" cy="${y}" r="${r+5}" fill="${col}" opacity=".28"/>`:""}<circle class="${blink&&lit?"blink":""}" cx="${x}" cy="${y}" r="${r}" fill="${col}"/>`; }
+const mast=(x,y1,y2)=>`<rect x="${x-2.5}" y="${y1}" width="5" height="${y2-y1}" fill="#6b7280"/>`;
+function svgWrap(inner,w=80,h=140){ return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`; }
+/* Hauptsignal (H/V): grün oben, rot Mitte, gelb unten */
+function hvMain(g,r,y){
+  const ls=[g&&"green",r&&"red",y&&"yellow"].filter(Boolean), h=ls.length===2?70:44, top=96-h;
+  return svgWrap(mast(40,96,140)+`<rect x="22" y="${top}" width="36" height="${h}" rx="9" fill="#14171c"/>`+ls.map((c,i)=>lamp(40,top+22+i*28,c)).join("")); }
+/* Vorsignal (H/V): Lichter links unten und rechts oben */
+function hvDist(ll,ur){ return svgWrap(mast(40,96,140)+`<rect x="14" y="16" width="52" height="78" rx="9" fill="#14171c"/>`+lamp(28,72,ll)+lamp(52,38,ur)); }
+/* Ks-Signal: ein Licht */
+function ks(c,blink){ return svgWrap(mast(40,96,140)+`<rect x="20" y="44" width="40" height="52" rx="10" fill="#14171c"/>`+lamp(40,70,c,8,blink)); }
+/* Lichtsperrsignal */
+function shLight(a,b,c1){ return svgWrap(`<rect x="12" y="74" width="56" height="44" rx="8" fill="#14171c"/>`+lamp(a[0],a[1],c1,6)+lamp(b[0],b[1],c1,6)+`<rect x="34" y="118" width="12" height="18" fill="#6b7280"/>`); }
+/* Formsperrsignal: weiße Scheibe mit schwarzem Balken */
+function shForm(diag){ return svgWrap(`<rect x="14" y="62" width="52" height="52" rx="4" fill="#111"/><circle cx="40" cy="88" r="22" fill="#f6f6f2"/>`+(diag?`<rect x="20" y="84" width="40" height="8" fill="#111" transform="rotate(-45 40 88)"/>`:`<rect x="20" y="84" width="40" height="8" fill="#111"/>`)+`<rect x="35" y="114" width="10" height="22" fill="#6b7280"/>`); }
+/* Lichtzusatzsignal mit Ziffer/Buchstabe */
+function zsText(t,c,shape){ const col=SIGC[c];
+  const frame=shape==="down"?`<path d="M10 40 L70 40 L40 96 Z" fill="#14171c"/>`:shape==="up"?`<path d="M40 30 L70 86 L10 86 Z" fill="#14171c"/>`:`<rect x="16" y="34" width="48" height="56" rx="6" fill="#14171c"/>`;
+  const ty=shape==="down"?72:shape==="up"?76:72;
+  return svgWrap(mast(40,96,140)+frame+`<text x="40" y="${ty}" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="${shape?26:34}" fill="${col}" style="filter:drop-shadow(0 0 3px ${col})">${t}</text>`); }
+function zsDots(pts,c,blink){ return svgWrap(mast(40,96,140)+`<rect x="14" y="28" width="52" height="68" rx="8" fill="#14171c"/>`+pts.map(([x,y])=>lamp(x,y,c,6,blink)).join("")); }
+function board(inner){ return svgWrap(inner+mast(40,100,140)); }
+function elBoard(sym){ return board(`<g transform="rotate(45 40 56)"><rect x="12" y="28" width="56" height="56" fill="#fff"/><rect x="16" y="32" width="48" height="48" fill="#1f5fbf"/></g>`+sym); }
+
+const SIGNALS=[
+  {cat:"Hauptsignale",code:"Hp 0",name:"Halt",text:"Halt vor dem Signal.",svg:()=>hvMain(0,1,0)},
+  {cat:"Hauptsignale",code:"Hp 1",name:"Fahrt",text:"Fahrt mit der zulässigen Geschwindigkeit.",svg:()=>hvMain(1,0,0)},
+  {cat:"Hauptsignale",code:"Hp 2",name:"Langsamfahrt",text:"Grün über Gelb. Im anschließenden Weichenbereich höchstens 40 km/h, wenn kein Zs 3 etwas anderes anzeigt.",svg:()=>hvMain(1,0,1)},
+  {cat:"Vorsignale",code:"Vr 0",name:"Halt erwarten",text:"Zwei gelbe Lichter, nach rechts steigend. Am nächsten Hauptsignal ist Halt zu erwarten.",svg:()=>hvDist("yellow","yellow")},
+  {cat:"Vorsignale",code:"Vr 1",name:"Fahrt erwarten",text:"Zwei grüne Lichter, nach rechts steigend.",svg:()=>hvDist("green","green")},
+  {cat:"Vorsignale",code:"Vr 2",name:"Langsamfahrt erwarten",text:"Ein gelbes und ein grünes Licht, nach rechts steigend (Grün oben).",svg:()=>hvDist("yellow","green")},
+  {cat:"Ks-Signale",code:"Ks 1",name:"Fahrt",text:"Ein grünes Licht. Fahrt mit der zulässigen Geschwindigkeit.",svg:()=>ks("green")},
+  {cat:"Ks-Signale",code:"Ks 1 blinkend",name:"Fahrt, Geschwindigkeitsbeschränkung erwarten",text:"Grün blinkend, meist zusammen mit Zs 3v: Am nächsten Signal gilt eine niedrigere Geschwindigkeit.",svg:()=>ks("green",true)},
+  {cat:"Ks-Signale",code:"Ks 2",name:"Halt erwarten",text:"Ein gelbes Licht. Am nächsten Hauptsignal ist Halt zu erwarten.",svg:()=>ks("yellow")},
+  {cat:"Ks-Signale",code:"Hp 0",name:"Halt (Ks-Signal)",text:"Ein rotes Licht. Halt vor dem Signal.",svg:()=>ks("red")},
+  {cat:"Sperrsignale",code:"Sh 0",name:"Halt! Fahrverbot",text:"Lichtsperrsignal: zwei rote Lichter waagerecht nebeneinander.",svg:()=>shLight([28,96],[52,96],"red")},
+  {cat:"Sperrsignale",code:"Sh 1",name:"Fahrverbot aufgehoben",text:"Lichtsperrsignal: zwei weiße Lichter, nach rechts steigend.",svg:()=>shLight([28,106],[52,86],"white")},
+  {cat:"Sperrsignale",code:"Sh 0",name:"Halt! Fahrverbot (Form)",text:"Formsperrsignal: waagerechter schwarzer Streifen auf weißer runder Scheibe.",svg:()=>shForm(false)},
+  {cat:"Sperrsignale",code:"Sh 1",name:"Fahrverbot aufgehoben (Form)",text:"Formsperrsignal: nach rechts steigender schwarzer Streifen.",svg:()=>shForm(true)},
+  {cat:"Zusatzsignale",code:"Zs 1",name:"Ersatzsignal",text:"Drei weiße Lichter in Form eines A (oder ein weißes Blinklicht). Am Halt zeigenden oder gestörten Hauptsignal ohne schriftlichen Befehl vorbeifahren.",svg:()=>zsDots([[40,44],[26,78],[54,78]],"white")},
+  {cat:"Zusatzsignale",code:"Zs 7",name:"Vorsichtsignal",text:"Drei gelbe Lichter in Form eines V. Am Halt zeigenden oder gestörten Hauptsignal ohne schriftlichen Befehl vorbeifahren, Weiterfahrt auf Sicht.",svg:()=>zsDots([[26,44],[54,44],[40,78]],"yellow")},
+  {cat:"Zusatzsignale",code:"Zs 3",name:"Geschwindigkeitsanzeiger",text:"Weiße Kennziffer. Ab dem Signal gilt höchstens Kennziffer × 10 km/h, hier also 60 km/h.",svg:()=>zsText("6","white","down")},
+  {cat:"Zusatzsignale",code:"Zs 3v",name:"Geschwindigkeitsvoranzeiger",text:"Gelbe Kennziffer. Am nächsten Zs 3 gilt die angezeigte Geschwindigkeit, hier 60 km/h.",svg:()=>zsText("6","yellow","up")},
+  {cat:"Zusatzsignale",code:"Zs 2",name:"Richtungsanzeiger",text:"Weißer Buchstabe: Der Fahrweg führt in die angezeigte Richtung.",svg:()=>zsText("M","white")},
+  {cat:"Zusatzsignale",code:"Zs 2v",name:"Richtungsvoranzeiger",text:"Gelber Buchstabe: Am nächsten Signal ist der Richtungsanzeiger Zs 2 zu erwarten.",svg:()=>zsText("M","yellow")},
+  {cat:"Tafeln",code:"Lf 7",name:"Geschwindigkeitssignal",text:"Weiße Tafel mit schwarzer Kennziffer. Ab hier höchstens Kennziffer × 10 km/h, hier also 80 km/h.",svg:()=>board(`<rect x="16" y="22" width="48" height="66" fill="#fff" stroke="#111" stroke-width="3"/><text x="40" y="74" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="44" fill="#111">8</text>`)},
+  {cat:"Tafeln",code:"Ne 4",name:"Schachbretttafel",text:"Das Hauptsignal steht an ungewöhnlicher Stelle, zum Beispiel links vom Gleis.",svg:()=>board(`<rect x="18" y="20" width="44" height="72" fill="#fff" stroke="#111" stroke-width="2"/>`+[0,1,2,3,4,5].flatMap(r=>[0,1,2,3].filter(c=>(r+c)%2===0).map(c=>`<rect x="${18+c*11}" y="${20+r*12}" width="11" height="12" fill="#111"/>`)).join(""))},
+  {cat:"Fahrleitung",code:"El 4",name:"„Bügel ab“-Signal",text:"Blaue Tafel mit waagerechtem weißem Streifen. Stromabnehmer müssen hier gesenkt sein.",svg:()=>elBoard(`<rect x="22" y="52" width="36" height="8" fill="#fff"/>`)},
+  {cat:"Fahrleitung",code:"El 5",name:"„Bügel an“-Signal",text:"Blaue Tafel mit senkrechtem weißem Streifen. Stromabnehmer dürfen wieder gehoben werden.",svg:()=>elBoard(`<rect x="36" y="38" width="8" height="36" fill="#fff"/>`)},
+  {cat:"Fahrleitung",code:"El 6",name:"Halt für Fahrzeuge mit gehobenem Stromabnehmer",text:"Blaue Tafel mit weißem Quadrat-Rahmen. Hier halten, wenn der Stromabnehmer gehoben ist.",svg:()=>elBoard(`<g transform="rotate(45 40 56)"><rect x="28" y="44" width="24" height="24" fill="none" stroke="#fff" stroke-width="5"/></g>`)}
+];
+const SIG_CATS=["Alle",...[...new Set(SIGNALS.map(s=>s.cat))]];
+let sigCat="Alle", sigMode="view", quiz=null;
+function sigList(){ return SIGNALS.filter(s=>sigCat==="Alle"||s.cat===sigCat); }
+function renderSigCats(){ $("#sigCats").innerHTML=SIG_CATS.map(c=>`<button type="button" class="${c===sigCat?"on":""}" data-cat="${esc(c)}">${esc(c)}</button>`).join(""); }
+function renderSig(){
+  renderSigCats();
+  if(sigMode==="quiz"){ renderQuiz(); return; }
+  $("#sigBody").innerHTML=`<div class="siggrid">${sigList().map(s=>`<div class="sigcard"><div class="art">${s.svg()}</div><div><span class="sigcode">${esc(s.code)}</span><span class="nm">${esc(s.name)}</span></div><p>${esc(s.text)}</p></div>`).join("")}</div>
+    <p class="signote">Lernhilfe mit einer Auswahl gängiger Signale, schematisch gezeichnet und ohne Gewähr. Verbindlich sind das Signalbuch (Ril 301) und die örtlichen Regeln.</p>`;
+}
+function newQuestion(){
+  const pool=sigList(); if(pool.length<2){ quiz.cur=null; return; }
+  let s; do{ s=pool[Math.floor(Math.random()*pool.length)]; }while(pool.length>1&&quiz.cur&&s===quiz.cur.s);
+  const others=SIGNALS.filter(x=>x!==s&&x.name!==s.name).sort(()=>Math.random()-.5).slice(0,3);
+  quiz.cur={s,opts:[s,...others].sort(()=>Math.random()-.5),answered:null};
+}
+function renderQuiz(){
+  if(!quiz){ quiz={right:0,total:0,cur:null}; newQuestion(); }
+  const c=quiz.cur;
+  if(!c){ $("#sigBody").innerHTML='<p class="hint">In dieser Kategorie gibt es zu wenige Signale zum Üben. Wähle „Alle“.</p>'; return; }
+  $("#sigBody").innerHTML=`<div class="quiz"><div class="art">${c.s.svg()}</div><div class="q">Was zeigt dieses Signal?</div>
+    <div class="qopts">${c.opts.map((o,i)=>{ let cls=""; if(c.answered!=null){ if(o===c.s) cls="right"; else if(i===c.answered) cls="wrong"; }
+      return `<button type="button" class="${cls}" data-opt="${i}" ${c.answered!=null?"disabled":""}><span class="sigcode">${esc(o.code)}</span>${esc(o.name)}</button>`; }).join("")}</div>
+    ${c.answered!=null?`<div class="qexplain">${c.opts[c.answered]===c.s?"Richtig! ":"Nicht ganz. "}${esc(c.s.code)} „${esc(c.s.name)}“: ${esc(c.s.text)}</div>`:""}
+    <div class="qfoot"><span class="qscore">${quiz.right} von ${quiz.total} richtig</span>${c.answered!=null?'<button type="button" class="btn primary" id="qNext">Nächstes Signal</button>':'<button type="button" class="btn" id="qSkip">Überspringen</button>'}</div></div>`;
+}
+$("#sigBody").addEventListener("click",e=>{
+  const o=e.target.closest("[data-opt]");
+  if(o&&quiz&&quiz.cur&&quiz.cur.answered==null){ const i=+o.dataset.opt; quiz.cur.answered=i; quiz.total++; if(quiz.cur.opts[i]===quiz.cur.s){quiz.right++;vibrate(15);} renderQuiz(); return; }
+  if(e.target.closest("#qNext")||e.target.closest("#qSkip")){ newQuestion(); renderQuiz(); $("#sigBody").scrollTop=0; }
+});
+$("#sigCats").addEventListener("click",e=>{ const b=e.target.closest("[data-cat]"); if(!b) return; sigCat=b.dataset.cat; if(quiz){ newQuestion(); } renderSig(); $("#sigBody").scrollTop=0; });
+document.querySelectorAll("input[name=sigmode]").forEach(r=>r.onchange=e=>{ sigMode=e.target.value; if(sigMode==="quiz"&&!quiz){ quiz={right:0,total:0,cur:null}; newQuestion(); } renderSig(); $("#sigBody").scrollTop=0; });
+$("#btnSig").onclick=()=>{ renderSig(); openSheet("#sheetSig"); };
+$("#sigBack").onclick=()=>{ openSheet("#sheetSettings"); };
 
 /* ============ EINFÜHRUNG für neue Nutzer ============ */
 function tourSteps(){
