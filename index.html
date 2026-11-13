@@ -425,6 +425,15 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .sigcode{display:inline-block;background:var(--red);color:#fff;font-weight:800;font-size:12px;padding:2px 8px;border-radius:6px;margin-right:6px}
 .signote{font-size:12px;color:var(--muted);margin:14px 2px 4px}
 .blink{animation:sigblink 1s steps(1) infinite}
+.mv-ud{animation:mvud 1.2s ease-in-out infinite}
+.mv-lr{animation:mvlr 1.1s ease-in-out infinite}
+.mv-in{animation:mvin 1s ease-in-out infinite;transform-origin:40px 50px}
+.mv-rot{animation:mvrot 1.4s linear infinite}
+@keyframes mvud{0%,100%{transform:rotate(-35deg)}50%{transform:rotate(55deg)}}
+@keyframes mvlr{0%,100%{transform:rotate(-25deg)}50%{transform:rotate(25deg)}}
+@keyframes mvin{0%,100%{transform:scaleX(1)}50%{transform:scaleX(.45)}}
+@keyframes mvrot{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.mv-ud,.mv-lr,.mv-in,.mv-rot{animation:none}}
 @keyframes sigblink{50%{opacity:.08}}
 @media (prefers-reduced-motion:reduce){.blink{animation:none}}
 .quiz{display:flex;flex-direction:column;gap:12px}
@@ -1167,7 +1176,7 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",()=>{if(s
 
 /* Neue Version erkennen: eigene Version mit version.json auf dem Server vergleichen.
    Die Version ändert sich nur, wenn sich die App wirklich geändert hat (nicht bei Daten-Updates). */
-const APP_VERSION="631f849c9b", APP_DATE="2026-11-13T16:40:56Z";
+const APP_VERSION="eb1d9809cf", APP_DATE="2026-11-13T16:44:36Z";
 async function serverVersion(){
   try{ const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); if(!r.ok) return null; return (await r.json()).v||null; }catch{ return null; }
 }
@@ -2526,6 +2535,18 @@ function zsDots(pts,c,blink){ return svgWrap(mast(40,96,140)+`<rect x="14" y="28
 function board(inner){ return svgWrap(inner+mast(40,100,140)); }
 function elBoard(sym){ return board(`<g transform="rotate(45 40 56)"><rect x="12" y="28" width="56" height="56" fill="#fff"/><rect x="16" y="32" width="48" height="48" fill="#1f5fbf"/></g>`+sym); }
 
+/* Handzeichen: Person mit Arm/Handlampe, Bewegung als Animation (Tag) */
+function handSig(kind){
+  const body=`<circle cx="40" cy="30" r="9" fill="#e9c9a7"/><path d="M28 44 Q40 38 52 44 L50 92 L30 92 Z" fill="#f28c28"/><rect x="31" y="92" width="7" height="34" fill="#334"/><rect x="42" y="92" width="7" height="34" fill="#334"/>`;
+  const arm=(cls,x2,y2)=>`<g class="${cls}" style="transform-origin:50px 50px"><line x1="50" y1="50" x2="${x2}" y2="${y2}" stroke="#f28c28" stroke-width="7" stroke-linecap="round"/><circle cx="${x2}" cy="${y2}" r="4.5" fill="#e9c9a7"/></g>`;
+  const hint=(d)=>`<path d="${d}" fill="none" stroke="#14171c" stroke-width="2" stroke-dasharray="3 3" marker-end="url(#ah)"/>`;
+  const defs=`<defs><marker id="ah" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0 0 6 3 0 6z" fill="#14171c"/></marker></defs>`;
+  if(kind==="ra1") return svgWrap(defs+body+arm("mv-ud",66,30)+hint("M72 20 V70")+hint("M72 70 V20"));
+  if(kind==="ra2") return svgWrap(defs+body+arm("mv-lr",72,50)+hint("M58 20 H76"));
+  if(kind==="ra3") return svgWrap(defs+body.replace('cx="40" cy="30"','cx="40" cy="30"')+`<g class="mv-in"><line x1="30" y1="50" x2="16" y2="50" stroke="#f28c28" stroke-width="7" stroke-linecap="round"/><line x1="50" y1="50" x2="64" y2="50" stroke="#f28c28" stroke-width="7" stroke-linecap="round"/></g>`+hint("M8 40 H24")+hint("M72 40 H56"));
+  if(kind==="ra5") return svgWrap(defs+body+arm("mv-rot",66,34)+`<circle cx="62" cy="40" r="14" fill="none" stroke="#14171c" stroke-width="2" stroke-dasharray="3 3"/>`);
+}
+
 const SIGNALS=[
   {cat:"Hauptsignale",code:"Hp 0",name:"Halt",text:"Halt vor dem Signal.",svg:()=>hvMain(0,1,0)},
   {cat:"Hauptsignale",code:"Hp 1",name:"Fahrt",text:"Fahrt mit der zulässigen Geschwindigkeit.",svg:()=>hvMain(1,0,0)},
@@ -2551,6 +2572,15 @@ const SIGNALS=[
   {cat:"Tafeln",code:"Ne 4",name:"Schachbretttafel",text:"Das Hauptsignal steht an ungewöhnlicher Stelle, zum Beispiel links vom Gleis.",svg:()=>board(`<rect x="18" y="20" width="44" height="72" fill="#fff" stroke="#111" stroke-width="2"/>`+[0,1,2,3,4,5].flatMap(r=>[0,1,2,3].filter(c=>(r+c)%2===0).map(c=>`<rect x="${18+c*11}" y="${20+r*12}" width="11" height="12" fill="#111"/>`)).join(""))},
   {cat:"Fahrleitung",code:"El 4",name:"„Bügel ab“-Signal",text:"Blaue Tafel mit waagerechtem weißem Streifen. Stromabnehmer müssen hier gesenkt sein.",svg:()=>elBoard(`<rect x="22" y="52" width="36" height="8" fill="#fff"/>`)},
   {cat:"Fahrleitung",code:"El 5",name:"„Bügel an“-Signal",text:"Blaue Tafel mit senkrechtem weißem Streifen. Stromabnehmer dürfen wieder gehoben werden.",svg:()=>elBoard(`<rect x="36" y="38" width="8" height="36" fill="#fff"/>`)},
+  {cat:"Sperrsignale",code:"Sh 2",name:"Schutzhaltsignal",text:"Rechteckige rote Scheibe mit weißem Rand, zum Beispiel am Gleisende. Halt für alle Fahrten.",svg:()=>board(`<rect x="14" y="30" width="52" height="40" fill="#fff"/><rect x="18" y="34" width="44" height="32" fill="#e3001b"/>`)},
+  {cat:"Rangiersignale",code:"Ra 1",name:"Wegfahren",text:"Arm senkrecht auf und ab bewegen (nachts die Handlampe). Mundpfeife: ein langer Ton.",svg:()=>handSig("ra1")},
+  {cat:"Rangiersignale",code:"Ra 2",name:"Herkommen",text:"Arm waagerecht hin und her bewegen (nachts die Handlampe). Mundpfeife: zwei mäßig lange Töne.",svg:()=>handSig("ra2")},
+  {cat:"Rangiersignale",code:"Ra 3",name:"Aufdrücken",text:"Beide Arme in Schulterhöhe wiederholt einander nähern. Mundpfeife: zwei kurze Töne schnell hintereinander.",svg:()=>handSig("ra3")},
+  {cat:"Rangiersignale",code:"Ra 5",name:"Rangierhalt",text:"Arm kreisförmig bewegen (nachts die Handlampe). Mundpfeife: drei kurze Töne.",svg:()=>handSig("ra5")},
+  {cat:"Rangiersignale",code:"Ra 10",name:"Rangierhalttafel",text:"Über diese Tafel hinaus darf nicht rangiert werden.",svg:()=>board(`<path d="M12 92 V58 A28 28 0 0 1 68 58 V92 Z" fill="#fff" stroke="#111" stroke-width="3"/><text x="40" y="62" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="9.5" fill="#111">Halt für</text><text x="40" y="74" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="9.5" fill="#111">Rangier-</text><text x="40" y="86" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="9.5" fill="#111">fahrten</text>`)},
+  {cat:"Rangiersignale",code:"Ra 11",name:"Wartezeichen",text:"Gelbes W mit schwarzem Rand. Rangierfahrten halten hier und warten auf den Auftrag zur Weiterfahrt.",svg:()=>board(`<text x="40" y="84" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="58" fill="#ffd400" stroke="#111" stroke-width="2.5">W</text>`)},
+  {cat:"Rangiersignale",code:"Ra 12",name:"Grenzzeichen",text:"Rot-weißes Zeichen zwischen zusammenlaufenden Gleisen. Bis hierhin darf das Gleis besetzt werden, ohne das Nachbargleis zu gefährden.",svg:()=>svgWrap(`<rect x="0" y="118" width="80" height="22" fill="#8d8a80"/><rect x="31" y="70" width="18" height="52" fill="#fff" stroke="#111" stroke-width="1"/>`+[0,1,2,3].map(i=>`<rect x="31" y="${70+i*13}" width="18" height="6.5" fill="#e3001b"/>`).join(""))},
+  {cat:"Tafeln",code:"Ne 5",name:"Haltetafel",text:"Halteplatz der Zugspitze bei planmäßig haltenden Zügen. Oft mit Zusatzschild für die Zuglänge.",svg:()=>board(`<rect x="18" y="24" width="44" height="58" fill="#fff" stroke="#111" stroke-width="3"/><text x="40" y="68" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="40" fill="#111">H</text>`)},
   {cat:"Fahrleitung",code:"El 6",name:"Halt für Fahrzeuge mit gehobenem Stromabnehmer",text:"Blaue Tafel mit weißem Quadrat-Rahmen. Hier halten, wenn der Stromabnehmer gehoben ist.",svg:()=>elBoard(`<g transform="rotate(45 40 56)"><rect x="28" y="44" width="24" height="24" fill="none" stroke="#fff" stroke-width="5"/></g>`)}
 ];
 const SIG_CATS=["Alle",...[...new Set(SIGNALS.map(s=>s.cat))]];
