@@ -794,6 +794,7 @@ const TYPES = {
   uw:     {label:"Unterwerk / Schaltposten", short:"UW", color:"#309fd1"},
   gsmr:   {label:"GSM-R-Mast",               short:"GS", color:"#00a099"},
   dienst: {label:"Dienststelle",             short:"⌂",  color:"#14181d", icon:"home"},
+  anlage: {label:"Bahnanlage",               short:"BA", color:"#8a5a2b", icon:"rail"},
   sonst:  {label:"Sonstiges",                short:"?",  color:"#646973"}
 };
 
@@ -1103,7 +1104,7 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",()=>{if(s
 
 /* Neue Version erkennen: eigene Version mit version.json auf dem Server vergleichen.
    Die Version ändert sich nur, wenn sich die App wirklich geändert hat (nicht bei Daten-Updates). */
-const APP_VERSION="86be7747c9", APP_DATE="2026-11-12T15:58:09Z";
+const APP_VERSION="ffc5fb1a97", APP_DATE="2026-11-13T13:56:41Z";
 async function serverVersion(){
   try{ const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); if(!r.ok) return null; return (await r.json()).v||null; }catch{ return null; }
 }
@@ -1347,12 +1348,14 @@ map.on("click",e=>{
 let me=null, markers=[], profiles={}, mapMarkers=[];
 const typeOn = store.get("sa_types",Object.fromEntries(Object.keys(TYPES).map(k=>[k,true])));
 const HOME_PATH="M-6 0.5 0-5 6 0.5M-4 -1v6h3v-3.5h2V5h3v-6";
-const pinSvg = t => `<svg viewBox="0 0 34 44"><path d="M17 43C17 43 3 27.5 3 17a14 14 0 0 1 28 0c0 10.5-14 26-14 26z" fill="${t.color}" stroke="#fff" stroke-width="2.5"/>${t.icon==="home"
-  ? `<g transform="translate(17 17)" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${HOME_PATH}"/></g>`
+const RAIL_PATH="M-1.4 -6.5 -4.2 6.5M1.4 -6.5 4.2 6.5M-3.2 -3.3h6.4M-4.5 0.6h9M-5.8 4.5h11.6";   // Gleis wie im App-Logo
+const ICON_PATH={home:HOME_PATH,rail:RAIL_PATH};
+const pinSvg = t => `<svg viewBox="0 0 34 44"><path d="M17 43C17 43 3 27.5 3 17a14 14 0 0 1 28 0c0 10.5-14 26-14 26z" fill="${t.color}" stroke="#fff" stroke-width="2.5"/>${ICON_PATH[t.icon]
+  ? `<g transform="translate(17 17)" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${ICON_PATH[t.icon]}"/></g>`
   : `<text x="17" y="21" text-anchor="middle">${esc(t.short)}</text>`}</svg>`;
-/* Inhalt der kleinen farbigen Typ-Marke: Haus-Symbol oder Kürzel */
-const tagInner = t => t.icon==="home"
-  ? `<svg viewBox="-8 -8 16 16" width="15" height="15" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${HOME_PATH}"/></svg>`
+/* Inhalt der kleinen farbigen Typ-Marke: Symbol oder Kürzel */
+const tagInner = t => ICON_PATH[t.icon]
+  ? `<svg viewBox="-8 -8 16 16" width="15" height="15" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${ICON_PATH[t.icon]}"/></svg>`
   : esc(t.short);
 function pinEl(typ,extra=""){const el=document.createElement("div");el.className="mk "+extra;el.innerHTML=pinSvg(TYPES[typ]||TYPES.sonst);return el;}
 
