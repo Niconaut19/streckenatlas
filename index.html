@@ -485,7 +485,9 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
       <label class="opt"><span class="tag" style="background:#fff;border:3px solid #1971c2;min-width:18px;height:18px;padding:0;border-radius:50%"></span><span class="lbl">Einkaufen<br><small>Supermarkt, Kiosk, Apotheke, Läden</small></span><span class="toggle"><input type="checkbox" id="poiShop" data-poi="shop"><i></i></span></label>
       <label class="opt"><span class="tag" style="background:#fff;border:3px solid #2f9e44;min-width:18px;height:18px;padding:0;border-radius:50%"></span><span class="lbl">Tanken &amp; Toiletten</span><span class="toggle"><input type="checkbox" id="poiSvc" data-poi="svc"><i></i></span></label>
     </div><p class="hint" style="margin-top:8px">Erscheint beim Hineinzoomen, etwa ab Straßen-Ebene. Daten aus OpenStreetMap, ohne Öffnungszeiten.</p></div></details>
-    <details class="group fold" data-fold="pts"><summary><h3>Bahnanlagen an deinen Strecken</h3><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="foldbody"><div class="list">
+    <details class="group fold" data-fold="pts"><summary><h3>Bahnanlagen &amp; Bahngelände</h3><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="foldbody"><div class="list">
+      <label class="opt"><span class="tag" style="background:rgba(236,0,22,.25);border:2px dashed #ec0016;min-width:22px;height:16px;padding:0;border-radius:3px"></span><span class="lbl">Bahngelände<br><small>Flächen, die als Bahnanlage genutzt werden</small></span><span class="toggle"><input type="checkbox" id="lyBgel" data-ly="bgel"><i></i></span></label>
+      <label class="opt"><span class="tag" style="background:transparent;border:2px solid #f5c400;min-width:22px;height:16px;padding:0;border-radius:2px"></span><span class="lbl">Flurstücksgrenzen<br><small>amtlich, beim nahen Hineinzoomen</small></span><span class="toggle"><input type="checkbox" id="lyFlur" data-ly="flur"><i></i></span></label>
       <label class="opt"><span class="tag" style="background:#fff;border:3px solid #ec0016;min-width:18px;height:18px;padding:0;border-radius:50%"></span><span class="lbl">Bahnhöfe &amp; Betriebsstellen<br><small>mit DS100-Kürzel</small></span><span class="toggle"><input type="checkbox" id="ptsBst" data-pts="bst"><i></i></span></label>
       <label class="opt"><span class="tag" style="background:#fff;border:2px solid #282d37;min-width:12px;height:12px;padding:0;border-radius:50%"></span><span class="lbl">Kilometrierung<br><small>ganze km ab Ortsebene, alle beim Hineinzoomen</small></span><span class="toggle"><input type="checkbox" id="ptsKm" data-km="1"><i></i></span></label>
       <label class="opt"><span class="tag" style="background:#f39200;min-width:14px;height:14px;padding:0;border-radius:50%"></span><span class="lbl">Bahnübergänge<br><small>ab näherem Zoom</small></span><span class="toggle"><input type="checkbox" id="ptsBue" data-pts="bue"><i></i></span></label>
@@ -968,6 +970,8 @@ const ormAttr = 'Bahndaten <a href="https://www.openrailwaymap.org" target="_bla
 const emptyFC = {type:"FeatureCollection",features:[]};
 const sources = {
   sat:{type:"raster",tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],tileSize:256,maxzoom:19,attribution:"Bilder © Esri, Maxar, Earthstar Geographics"},
+  flur:{type:"raster",tiles:["https://geoservices.bayern.de/od/wms/alkis/v1/parzellarkarte?service=WMS&request=GetMap&version=1.1.1&layers=by_alkis_parzellarkarte_umr_gelb&styles=&format=image/png&transparent=true&srs=EPSG:3857&bbox={bbox-epsg-3857}&width=512&height=512"],
+    tileSize:256,minzoom:15,maxzoom:20,bounds:[8.9,47.2,13.9,50.6],attribution:'Flurstücke © <a href="https://geodaten.bayern.de" target="_blank">Bayerische Vermessungsverwaltung</a>, CC BY 4.0'},
   dop:{type:"raster",tiles:["https://geoservices.bayern.de/od/wms/dop/v1/dop20?service=WMS&request=GetMap&version=1.1.1&layers=by_dop20c&styles=&format=image/jpeg&srs=EPSG:3857&bbox={bbox-epsg-3857}&width=512&height=512"],
     tileSize:256,minzoom:11,maxzoom:20,bounds:[8.9,47.2,13.9,50.6],attribution:'Luftbild © <a href="https://geodaten.bayern.de" target="_blank">Bayerische Vermessungsverwaltung</a>, CC BY 4.0'},
   labels:{type:"raster",tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"],tileSize:256,maxzoom:19},
@@ -1000,6 +1004,11 @@ const map = new maplibregl.Map({
       "text-size":["match",["get","class"],"city",17,"town",15,"village",13,"suburb",13,12],"text-max-width":8,"text-padding":4},
       filter:["in",["get","class"],["literal",["city","town","village","suburb","quarter","neighbourhood","hamlet"]]],
       paint:{"text-color":"#ffffff","text-halo-color":"rgba(0,0,0,.8)","text-halo-width":1.8}},
+    {id:"flur",type:"raster",source:"flur",minzoom:15,layout:{visibility:"none"},paint:{"raster-fade-duration":200,"raster-opacity":0.9}},
+    {id:"bgel-fill",type:"fill",source:"omt","source-layer":"landuse",minzoom:11,filter:["==",["get","class"],"railway"],layout:{visibility:"none"},
+      paint:{"fill-color":"#ec0016","fill-opacity":["interpolate",["linear"],["zoom"],11,0.22,17,0.14]}},
+    {id:"bgel-line",type:"line",source:"omt","source-layer":"landuse",minzoom:12,filter:["==",["get","class"],"railway"],layout:{visibility:"none","line-join":"round"},
+      paint:{"line-color":"#ec0016","line-width":["interpolate",["linear"],["zoom"],12,1,18,2.5],"line-dasharray":[3,2],"line-opacity":0.9}},
     ...ORM.map(o=>({id:"orm-"+o.key,type:"raster",source:"orm-"+o.key,layout:{visibility:"none"},paint:{"raster-fade-duration":200}})),
     {id:"lines-casing",type:"line",source:"lines",layout:{"line-cap":"round","line-join":"round"},paint:{"line-color":"#ffffff","line-width":["interpolate",["linear"],["zoom"],8,4,16,10],"line-opacity":.9}},
     {id:"lines",type:"line",source:"lines",layout:{"line-cap":"round","line-join":"round"},paint:{"line-color":["get","color"],"line-width":["interpolate",["linear"],["zoom"],8,2,16,6]}},
@@ -1104,7 +1113,7 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",()=>{if(s
 
 /* Neue Version erkennen: eigene Version mit version.json auf dem Server vergleichen.
    Die Version ändert sich nur, wenn sich die App wirklich geändert hat (nicht bei Daten-Updates). */
-const APP_VERSION="ffc5fb1a97", APP_DATE="2026-11-13T13:56:41Z";
+const APP_VERSION="3cea4a5afa", APP_DATE="2026-11-13T14:15:31Z";
 async function serverVersion(){
   try{ const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); if(!r.ok) return null; return (await r.json()).v||null; }catch{ return null; }
 }
@@ -1213,6 +1222,10 @@ function kmAt(lat,lng,l){
 }
 const fmtKm=v=>"km "+v.toLocaleString("de-DE",{minimumFractionDigits:1,maximumFractionDigits:1});
 $("#ptsBst").checked=ptsOn.bst!==false; $("#ptsBue").checked=ptsOn.bue!==false;
+const lyOn=Object.assign({bgel:true,flur:false},store.get("sa_ly",{}));
+const applyLy=()=>{ setVis("bgel-fill",lyOn.bgel); setVis("bgel-line",lyOn.bgel); setVis("flur",lyOn.flur); };
+document.querySelectorAll("[data-ly]").forEach(cb=>{cb.checked=lyOn[cb.dataset.ly];cb.onchange=()=>{lyOn[cb.dataset.ly]=cb.checked;store.set("sa_ly",lyOn);applyLy(); if(cb.dataset.ly==="flur"&&cb.checked&&map.getZoom()<15) toast("Flurstücksgrenzen erscheinen, wenn du nah heranzoomst");};});
+map.on("load",applyLy);
 const poiOn=Object.assign({food:true,shop:true,svc:true},store.get("sa_poi",{}));
 const applyPoi=()=>Object.keys(poiOn).forEach(k=>{setVis("poi-"+k,poiOn[k]);setVis("poi-"+k+"-icon",poiOn[k]);});
 document.querySelectorAll("[data-poi]").forEach(cb=>{cb.checked=poiOn[cb.dataset.poi];cb.onchange=()=>{poiOn[cb.dataset.poi]=cb.checked;store.set("sa_poi",poiOn);applyPoi();};});
