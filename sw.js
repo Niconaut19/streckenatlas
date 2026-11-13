@@ -2,7 +2,7 @@
 const SHELL = "sa-shell-v2";        // App-Dateien und Bibliotheken
 const DATA = "sa-data-v1";          // Strecken-, Bahnanlagen- und Kilometerdaten
 const SAVED = "sa-tiles-saved";     // gezielt für offline gespeicherte Kartenteile (bleiben)
-const RUNTIME = "sa-tiles-rt";      // beim Anschauen gemerkte Kartenteile (werden begrenzt)
+const RUNTIME = "sa-tiles-rt2";     // beim Anschauen gemerkte Kartenteile (werden begrenzt)
 const RUNTIME_MAX = 1000;   // ca. 50 MB, älteste werden zuerst entfernt
 
 const SHELL_URLS = [
@@ -22,6 +22,16 @@ self.addEventListener("install", e => {
 });
 self.addEventListener("activate", e => e.waitUntil((async () => {
   for (const k of await caches.keys()) if (k.startsWith("sa-shell-") && k !== SHELL) await caches.delete(k);
+  // Aufräumen nach dem Verwechslungsfehler: alte gemerkte Teile weg, falsch gespeicherte Luftbild-Teile (PNG statt JPEG) entfernen
+  await caches.delete("sa-tiles-rt");
+  try {
+    const saved = await caches.open(SAVED);
+    for (const req of await saved.keys()) {
+      if (!req.url.includes("/dop/")) continue;
+      const res = await saved.match(req);
+      if (res && !/jpe?g/i.test(res.headers.get("content-type") || "")) await saved.delete(req);
+    }
+  } catch (err) {}
   await self.clients.claim();
 })()));
 
@@ -35,7 +45,11 @@ function tileKey(url) {
     if (bb.length !== 4 || bb.some(isNaN)) return null;
     const w = bb[2] - bb[0], z = Math.round(Math.log2(2 * R / w));
     const x = Math.round((bb[0] + R) / w), y = Math.round((R - bb[3]) / w);
-    return `https://tilecache.streckenatlas/dop/${z}/${x}/${y}`;
+    // Art der Karte mit in den Schlüssel, sonst würden z. B. Luftbild und Flurstücke verwechselt
+    const layer = (u.searchParams.get("layers") || u.searchParams.get("LAYERS") || "").toLowerCase();
+    if (layer === "by_dop20c") return `https://tilecache.streckenatlas/dop/${z}/${x}/${y}`;
+    if (!layer) return null;
+    return `https://tilecache.streckenatlas/wms/${encodeURIComponent(layer)}/${z}/${x}/${y}`;
   }
   if (u.hostname === "tiles.openfreemap.org" && /\.pbf$/.test(u.pathname)) {
     const m = u.pathname.match(/\/(\d+)\/(\d+)\/(\d+)\.pbf$/);
