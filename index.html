@@ -396,6 +396,14 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .avatar{position:relative}
 .odot{position:absolute;right:-1px;bottom:-1px;width:13px;height:13px;border-radius:50%;background:#2f9e44;border:2.5px solid var(--white)}
 .conv .onl{font-style:normal;font-weight:600;font-size:12.5px;color:#2f9e44}
+.setbody{gap:22px}
+.setbody .group>h3{margin:0 0 8px;padding-left:4px;font-size:12.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.setbody .opt .lbl small{display:block;font-size:12.5px;color:var(--muted);margin-top:1px}
+.offcard{padding:14px;display:flex;flex-direction:column;gap:12px}
+.offhead .lbl b{display:block;font-size:15px}
+.offhead .lbl small{display:block;font-size:12.5px;color:var(--muted)}
+.offbtns{display:grid;grid-template-columns:2fr 1fr;gap:8px}
+.offcard .linkbtn{align-self:flex-start;padding:0;font-size:13px}
 .toast{position:fixed;z-index:60;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 28px);
   transform:translate(-50%,20px);opacity:0;transition:all .3s var(--ease);pointer-events:none;
   background:var(--inv-bg);color:var(--inv-fg);padding:12px 18px;border-radius:12px;font-weight:600;max-width:calc(100% - 110px);text-align:center;box-shadow:var(--shadow)}
@@ -572,51 +580,46 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 <section class="sheet" id="sheetSettings" aria-label="Einstellungen">
   <div class="grab"></div>
   <header><h2>Einstellungen</h2><button class="x" data-close aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
-  <div class="body">
+  <div class="body setbody">
     <div class="group"><h3>Darstellung</h3>
       <div class="seg" id="themeSeg">
         <label><input type="radio" name="theme" value="light" id="thLight">Hell</label>
         <label><input type="radio" name="theme" value="dark" id="thDark">Dunkel</label>
         <label><input type="radio" name="theme" value="auto" id="thAuto">Automatisch</label>
       </div>
-      <p class="hint" style="margin-top:8px">„Automatisch“ folgt der Einstellung deines Handys.</p>
     </div>
-    <details class="group fold" data-fold="set-nb"><summary><h3>Hinweise in der Nähe</h3><span class="sumnote" id="nbSum"></span><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="foldbody">
-      <p class="hint" style="margin-bottom:10px">Meldet sich, wenn du an eine Anlage herankommst. Funktioniert, solange die App geöffnet ist.</p>
+
+    <div class="group"><h3>Benachrichtigungen</h3>
       <div class="list">
-        <label class="opt"><span class="lbl">Hinweise einschalten</span><span class="toggle"><input type="checkbox" id="nbOn"><i></i></span></label>
-        <label class="opt"><span class="lbl">Umkreis</span><select id="nbRadius" class="minisel"><option value="150">150 m</option><option value="300">300 m</option><option value="500">500 m</option><option value="1000">1 km</option></select></label>
-        <label class="opt" id="nbSysRow"><span class="lbl">Auch als Mitteilung<br><small>Banner des Handys, wenn die App im Hintergrund noch offen ist</small></span><span class="toggle"><input type="checkbox" id="nbSys"><i></i></span></label>
-      </div>
-      <details class="tgroup" id="nbTypesFold" style="margin-top:14px"><summary><h3>Bei diesen Arten</h3><small class="hint" id="nbTypesSum" style="font-size:13px"></small><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
-        <div class="typetools"><button type="button" class="addbtn" id="nbAll">Alle</button><button type="button" class="addbtn" id="nbNone">Keine</button></div>
-        <div class="list" id="nbTypes"></div></details>
-    </div></details>
-    <details class="group fold" data-fold="offline"><summary><h3>Offline-Karten</h3><span class="sumnote" id="offSum"></span><svg class="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary><div class="foldbody stack">
-      <p class="hint">Speichert Luftbild sowie Straßen und Ortsnamen auf dem Handy, damit du sie ohne Netz siehst. Strecken, Bahnhöfe, Bahnübergänge, Kilometer und eure Objekte sind offline sowieso dabei.</p>
-      <button class="btn primary block" type="button" id="offLines">Meine Strecken speichern</button>
-      <button class="btn block" type="button" id="offView">Aktuellen Kartenausschnitt speichern</button>
-      <div id="offProg" class="stack" hidden>
-        <div class="offbar"><i id="offBar"></i></div>
-        <p class="hint" id="offTxt"></p>
-        <button class="btn small" type="button" id="offStop">Abbrechen</button>
-      </div>
-      <p class="hint" id="offInfo"></p>
-      <button class="linkbtn" type="button" id="offClear" hidden>Gespeicherte Karten löschen</button>
-    </div></details>
-    <div class="group"><h3>Chat</h3>
-      <div class="list">
-        <label class="opt"><span class="lbl">Meinen Online-Status zeigen<br><small>Kollegen sehen, wann du die App offen hast</small></span><span class="toggle"><input type="checkbox" id="cnOnline"><i></i></span></label>
-        <label class="opt"><span class="lbl">Banner bei neuen Nachrichten<br><small>Oben auf dem Bildschirm, wie bei WhatsApp</small></span><span class="toggle"><input type="checkbox" id="cnBanner"><i></i></span></label>
-        <label class="opt"><span class="lbl">Ton bei neuen Nachrichten<br><small>Solange die App geöffnet ist</small></span><span class="toggle"><input type="checkbox" id="cnSound"><i></i></span></label>
-        <label class="opt"><span class="lbl">Ton<br><small>Beim Auswählen hörst du ihn</small></span><select id="cnTone" class="minisel"></select></label>
-        <label class="opt" id="cnSysRow"><span class="lbl">Auch als Mitteilung des Handys<br><small>Wenn die App im Hintergrund noch offen ist</small></span><span class="toggle"><input type="checkbox" id="cnSys"><i></i></span></label>
+        <label class="opt"><span class="lbl">Ton bei Nachrichten</span><select id="cnTone" class="minisel" aria-label="Ton bei Nachrichten"></select></label>
+        <label class="opt" id="notifRow"><span class="lbl">Mitteilungen aufs Handy<br><small>Wenn die App im Hintergrund noch offen ist</small></span><span class="toggle"><input type="checkbox" id="notifSys"><i></i></span></label>
+        <label class="opt"><span class="lbl">Hinweise in der Nähe<br><small>Bei Anlagen, die auf der Karte eingeblendet sind</small></span><select id="nbRadius" class="minisel" aria-label="Hinweise in der Nähe"><option value="0">Aus</option><option value="150">150 m</option><option value="300">300 m</option><option value="500">500 m</option><option value="1000">1 km</option></select></label>
       </div>
     </div>
-    <div class="group"><h3>Hilfe</h3>
+
+    <div class="group"><h3>Privatsphäre</h3>
+      <div class="list">
+        <label class="opt"><span class="lbl">Online-Status zeigen<br><small>Kollegen sehen, wann du die App offen hast</small></span><span class="toggle"><input type="checkbox" id="cnOnline"><i></i></span></label>
+      </div>
+    </div>
+
+    <div class="group"><h3>Offline-Karten</h3>
+      <div class="list offcard">
+        <div class="offhead"><span class="lbl"><b id="offInfo">Noch keine Karten gespeichert</b><small>Luftbild und Straßen für unterwegs ohne Netz</small></span></div>
+        <div id="offProg" class="stack" hidden>
+          <div class="offbar"><i id="offBar"></i></div>
+          <div class="row" style="justify-content:space-between"><span class="hint" id="offTxt"></span><button class="btn small" type="button" id="offStop">Abbrechen</button></div>
+        </div>
+        <div class="offbtns"><button class="btn primary" type="button" id="offLines">Strecken speichern</button><button class="btn" type="button" id="offView">Ausschnitt</button></div>
+        <button class="linkbtn" type="button" id="offClear" hidden>Gespeicherte Karten löschen</button>
+        <span id="offSum" hidden></span>
+      </div>
+    </div>
+
+    <div class="group"><h3>Über die App</h3>
       <div class="list">
         <button type="button" class="opt setrow" id="btnTour"><span class="lbl">Einführung ansehen</span><svg class="rchev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>
-        <button type="button" class="opt setrow" id="btnCheckUpd"><span class="lbl">Nach neuer Version suchen<br><small id="appStand"></small></span><svg class="rchev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>
+        <button type="button" class="opt setrow" id="btnCheckUpd"><span class="lbl">Nach Update suchen<br><small id="appStand"></small></span><svg class="rchev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>
       </div>
     </div>
   </div>
@@ -1113,7 +1116,7 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",()=>{if(s
 
 /* Neue Version erkennen: eigene Version mit version.json auf dem Server vergleichen.
    Die Version ändert sich nur, wenn sich die App wirklich geändert hat (nicht bei Daten-Updates). */
-const APP_VERSION="3cea4a5afa", APP_DATE="2026-11-13T14:15:31Z";
+const APP_VERSION="ae0d6c5dfe", APP_DATE="2026-11-13T16:32:09Z";
 async function serverVersion(){
   try{ const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); if(!r.ok) return null; return (await r.json()).v||null; }catch{ return null; }
 }
@@ -1646,8 +1649,7 @@ document.querySelectorAll("[data-close]").forEach(b=>{
 $("#scrim").onclick=closeSheets;
 $("#btnLayers").onclick=()=>{$("#sheetLayers").classList.contains("open")?closeSheets():openSheet("#sheetLayers");};
 $("#userChip").onclick=()=>{ if($("#sheetUser").classList.contains("open")){closeSheets();return;} renderUserSheet();openSheet("#sheetUser");};
-$("#btnSettings").onclick=()=>{ if($("#sheetSettings").classList.contains("open")){closeSheets();return;} updateNbSum(); updateOffInfo(); openSheet("#sheetSettings");};
-function updateNbSum(){ const el=$("#nbSum"); if(el) el.textContent=nb.on?`an · ${nb.radius<1000?nb.radius+" m":"1 km"}`:"aus"; }
+$("#btnSettings").onclick=()=>{ if($("#sheetSettings").classList.contains("open")){closeSheets();return;} updateOffInfo(); openSheet("#sheetSettings");};
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("#personModal").hidden){$("#personModal").hidden=true;return;}closeSheets();setAddMode(false);}});
 
 /* Sheet nach unten wischen zum Schließen */
@@ -2213,19 +2215,13 @@ function onChatChange(payload){
 
 /* ============ NACHRICHTEN-BANNER (wie bei WhatsApp) ============ */
 const cn=Object.assign({banner:true,sys:false,sound:true,tone:"ding"},store.get("sa_chatnotify",{}));
-$("#cnSound").checked=cn.sound; $("#cnSound").onchange=e=>{cn.sound=e.target.checked;store.set("sa_chatnotify",cn); if(cn.sound){ unlockAudio(true); setTimeout(()=>playTone(),80);} else if(audioCtx){ audioCtx.suspend().catch(()=>{}); } };
-$("#cnTone").innerHTML=Object.entries(TONES).filter(([k])=>k!=="kurz").map(([k,t])=>`<option value="${k}">${t.label}</option>`).join("");
-$("#cnTone").value=cn.tone||"ding";
-$("#cnTone").onchange=e=>{ cn.tone=e.target.value; store.set("sa_chatnotify",cn); unlockAudio(true); setTimeout(async()=>{ if(!(await playTone(cn.tone))) toast("Ton konnte nicht abgespielt werden. Ist das Handy laut gestellt?"); },80); };
-$("#cnBanner").checked=cn.banner; $("#cnSys").checked=cn.sys; $("#cnSysRow").hidden=!("Notification" in window);
-$("#cnBanner").onchange=e=>{cn.banner=e.target.checked;store.set("sa_chatnotify",cn);};
-$("#cnSys").onchange=async e=>{
-  cn.sys=e.target.checked;
-  if(cn.sys&&Notification.permission!=="granted"){
-    try{ if((await Notification.requestPermission())!=="granted"){cn.sys=false;e.target.checked=false;toast("Mitteilungen wurden nicht erlaubt");} }
-    catch{cn.sys=false;e.target.checked=false;toast("Mitteilungen werden hier nicht unterstützt");}
-  }
-  store.set("sa_chatnotify",cn);
+cn.banner=true;   // Banner ist immer an
+$("#cnTone").innerHTML='<option value="aus">Aus</option>'+Object.entries(TONES).filter(([k])=>k!=="kurz").map(([k,t])=>`<option value="${k}">${t.label}</option>`).join("");
+$("#cnTone").value=cn.sound?(cn.tone||"ding"):"aus";
+$("#cnTone").onchange=e=>{
+  const v=e.target.value; cn.sound=v!=="aus"; if(cn.sound) cn.tone=v; store.set("sa_chatnotify",cn);
+  if(!cn.sound){ if(audioCtx) audioCtx.suspend().catch(()=>{}); return; }
+  unlockAudio(true); setTimeout(async()=>{ if(!(await playTone(cn.tone))) toast("Ton konnte nicht abgespielt werden. Ist das Handy laut gestellt?"); },80);
 };
 let mbTimer=null, mbConv=null, mbCount=0;
 function showChatBanner(m,count){
@@ -2239,7 +2235,6 @@ function showChatBanner(m,count){
     }
     return;
   }
-  if(!cn.banner){ toast(c===TEAM?`Neue Nachricht im Team von ${name}`:`${name} schreibt dir`); return; }
   const el=$("#msgBanner");
   mbCount = (!el.hidden&&mbConv===c) ? mbCount+1 : 1; mbConv=c;
   $("#mbAvatar").innerHTML = c===TEAM?TEAM_SVG:esc((name||"?")[0].toUpperCase());
@@ -2438,18 +2433,18 @@ async function runOffline(mode){
   updateOffInfo();
 }
 async function updateOffInfo(){
-  if(!("caches" in window)){ $("#offInfo").textContent="Dein Browser unterstützt keine Offline-Karten."; return; }
+  if(!("caches" in window)){ $("#offInfo").textContent="Auf diesem Gerät nicht möglich"; $("#offLines").disabled=$("#offView").disabled=true; return; }
   const n=(await (await caches.open(SAVED_CACHE)).keys()).length;
-  let usage=""; try{ const e=await navigator.storage.estimate(); usage=` · App-Speicher gesamt ${Math.round(e.usage/1048576)} MB`; }catch{}
-  $("#offInfo").textContent=n?`Gespeichert: ${n.toLocaleString("de-DE")} Kartenteile${usage}`:"Noch keine Karten gespeichert.";
-  $("#offSum").textContent=n?"gespeichert":""; $("#offClear").hidden=!n;
+  let mb=""; try{ const e=await navigator.storage.estimate(); mb=` · ${Math.round(e.usage/1048576)} MB`; }catch{}
+  $("#offInfo").textContent=n?`${n.toLocaleString("de-DE")} Kartenteile gespeichert${mb}`:"Noch keine Karten gespeichert";
+  $("#offClear").hidden=!n;
 }
+
 $("#offLines").onclick=()=>runOffline("lines");
 $("#offView").onclick=()=>{closeSheets();setTimeout(()=>runOfflineView(),350);};
 async function runOfflineView(){ await runOffline("view"); }
 $("#offStop").onclick=()=>{ if(offAbort) offAbort.stop=true; };
 $("#offClear").onclick=async()=>{ if(!(await ask("Gespeicherte Karten löschen?","Luftbild und Straßennamen für offline werden vom Handy entfernt. Strecken und Objekte bleiben.","Löschen"))) return; await caches.delete(SAVED_CACHE); updateOffInfo(); toast("Offline-Karten gelöscht"); };
-document.querySelector('details[data-fold="offline"]').addEventListener("toggle",e=>{ if(e.target.open) updateOffInfo(); });
 updateOffInfo();
 
 /* ============ EINFÜHRUNG für neue Nutzer ============ */
@@ -2509,27 +2504,22 @@ const nb=Object.assign({on:false,radius:"300",sys:false,types:{estw:true,gsmr:tr
 const nbSeen=new Map();           // Objekt-ID -> Zeitpunkt des letzten Hinweises
 const NB_REPEAT=45*60*1000;       // derselbe Hinweis frühestens nach 45 Minuten wieder
 const saveNb=()=>store.set("sa_nearby",nb);
-function renderNbSettings(){
-  $("#nbOn").checked=nb.on; $("#nbRadius").value=nb.radius; $("#nbSys").checked=nb.sys;
-  $("#nbSysRow").hidden=!("Notification" in window);
-  $("#nbTypes").innerHTML=Object.entries(TYPES).map(([k,t])=>`<label class="opt"><span class="tag" style="background:${t.color}">${tagInner(t)}</span><span class="lbl">${t.label}</span>${toggle("data-nbtype",k,!!nb.types[k])}</label>`).join("");
-  renderNbTypesSum();
-}
-function renderNbTypesSum(){const ks=Object.keys(TYPES),n=ks.filter(k=>nb.types[k]).length;$("#nbTypesSum").textContent=n===ks.length?"alle aktiv":`${n} von ${ks.length} aktiv`;}
-const setAllNb=on=>{Object.keys(TYPES).forEach(k=>nb.types[k]=on);saveNb();renderNbSettings();};
-$("#nbAll").onclick=()=>setAllNb(true); $("#nbNone").onclick=()=>setAllNb(false);
-renderNbSettings();
-$("#nbOn").onchange=e=>{nb.on=e.target.checked;saveNb();updateNbSum();
-  if(nb.on){ if(startWatch(false)) toast("Hinweise an: Du bekommst eine Meldung, wenn du in die Nähe kommst"); if(lastLL) checkNearby(lastLL);} };
-$("#nbRadius").onchange=e=>{nb.radius=e.target.value;saveNb();updateNbSum();};
-$("#nbTypes").addEventListener("change",e=>{const k=e.target.dataset.nbtype;if(k){nb.types[k]=e.target.checked;saveNb();renderNbTypesSum();}});
-$("#nbSys").onchange=async e=>{
-  nb.sys=e.target.checked;
-  if(nb.sys && Notification.permission!=="granted"){
-    try{const r=await Notification.requestPermission(); if(r!=="granted"){nb.sys=false;e.target.checked=false;toast("Mitteilungen wurden nicht erlaubt");}}
-    catch{nb.sys=false;e.target.checked=false;toast("Mitteilungen werden hier nicht unterstützt");}
+/* Hinweise in der Nähe: "Aus" oder Umkreis; es zählen die Arten, die auf der Karte eingeblendet sind */
+$("#nbRadius").value=nb.on?String(nb.radius):"0";
+$("#nbRadius").onchange=e=>{
+  const v=e.target.value; nb.on=v!=="0"; if(nb.on) nb.radius=v; saveNb();
+  if(nb.on){ if(startWatch(false)) toast("Hinweise an: Du bekommst eine Meldung, wenn du in die Nähe kommst"); if(lastLL) checkNearby(lastLL); }
+};
+/* Ein Schalter für Mitteilungen aufs Handy (Chat und Hinweise) */
+$("#notifRow").hidden=!("Notification" in window);
+$("#notifSys").checked=!!(nb.sys||(store.get("sa_chatnotify",{}).sys));
+$("#notifSys").onchange=async e=>{
+  let on=e.target.checked;
+  if(on&&Notification.permission!=="granted"){
+    try{ if((await Notification.requestPermission())!=="granted"){on=false;toast("Mitteilungen wurden nicht erlaubt");} }
+    catch{on=false;toast("Mitteilungen werden hier nicht unterstützt");}
   }
-  saveNb();
+  e.target.checked=on; nb.sys=on; saveNb(); cn.sys=on; store.set("sa_chatnotify",cn);
 };
 let swReg=null;
 if("serviceWorker" in navigator){
@@ -2545,7 +2535,7 @@ function checkNearby(ll){
   if(!nb.on||!me||me.role==="wartend") return;
   const now=Date.now(); if(now-nbLastCheck<4000) return; nbLastCheck=now;
   const r=+nb.radius;
-  const hits=markers.filter(m=>nb.types[m.typ]).map(m=>({m,d:distM(ll,[m.lng,m.lat])}))
+  const hits=markers.filter(m=>typeOn[m.typ]!==false).map(m=>({m,d:distM(ll,[m.lng,m.lat])}))
     .filter(h=>h.d<=r && (!nbSeen.has(h.m.id)||now-nbSeen.get(h.m.id)>NB_REPEAT)).sort((a,b)=>a.d-b.d);
   if(!hits.length) return;
   hits.forEach(h=>nbSeen.set(h.m.id,now));
