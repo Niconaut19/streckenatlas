@@ -887,10 +887,13 @@ function unlockAudio(force){
     audioCtx.resume().then(()=>{ audioReady=true; audioCtx.suspend().catch(()=>{}); stopUnlockListeners(); }).catch(()=>{});
   }catch{}
 }
-const unlockEvents=["pointerdown","keydown"];
-const onFirstTouch=()=>unlockAudio(false);
-unlockEvents.forEach(t=>document.addEventListener(t,onFirstTouch,{passive:true}));
-function stopUnlockListeners(){ unlockEvents.forEach(t=>document.removeEventListener(t,onFirstTouch)); }
+/* Beim Öffnen der App und beim Antippen der Karte wird die Audio-Ausgabe NICHT angefasst,
+   sonst stoppt iPhone/CarPlay das Radio. Vorbereitet wird der Ton erst, wenn man den Chat öffnet
+   oder in den Einstellungen einen Ton auswählt. */
+function stopUnlockListeners(){}
+function releaseAudio(){ clearTimeout(audioIdle); if(audioCtx){ try{audioCtx.close();}catch{} } audioCtx=null; audioReady=false; }
+// App im Hintergrund: Audio komplett freigeben, damit nichts die Wiedergabe anderer Apps blockiert
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="hidden") releaseAudio(); });
 /* Eigene Töne (selbst erzeugt). Jede Note: [Frequenz, Start, Dauer, Lautstärke, Wellenform] */
 const TONES={
   ding:   {label:"Ding",       notes:[[880,0,.14,.22,"sine"],[1319,.11,.26,.22,"sine"]]},
@@ -1176,7 +1179,7 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",()=>{if(s
 
 /* Neue Version erkennen: eigene Version mit version.json auf dem Server vergleichen.
    Die Version ändert sich nur, wenn sich die App wirklich geändert hat (nicht bei Daten-Updates). */
-const APP_VERSION="eb1d9809cf", APP_DATE="2026-11-13T16:44:36Z";
+const APP_VERSION="a50768e108", APP_DATE="2026-11-17T16:01:28Z";
 async function serverVersion(){
   try{ const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); if(!r.ok) return null; return (await r.json()).v||null; }catch{ return null; }
 }
@@ -2181,7 +2184,7 @@ async function loadChat(){
 }
 $("#btnChat").onclick=()=>{
   if($("#sheetChat").classList.contains("open")){closeSheets();return;}
-  closeSheets(); setAddMode(false); openSheet("#sheetChat"); chatOpen=true; selMsg=null;
+  closeSheets(); setAddMode(false); openSheet("#sheetChat"); chatOpen=true; selMsg=null; unlockAudio(false);
   if(chatConv) openConv(chatConv); else showConvList();
 };
 new MutationObserver(()=>{chatOpen=$("#sheetChat").classList.contains("open");}).observe($("#sheetChat"),{attributes:true,attributeFilter:["class"]});
@@ -2280,7 +2283,7 @@ $("#cnTone").innerHTML='<option value="aus">Aus</option>'+Object.entries(TONES).
 $("#cnTone").value=cn.sound?(cn.tone||"ding"):"aus";
 $("#cnTone").onchange=e=>{
   const v=e.target.value; cn.sound=v!=="aus"; if(cn.sound) cn.tone=v; store.set("sa_chatnotify",cn);
-  if(!cn.sound){ if(audioCtx) audioCtx.suspend().catch(()=>{}); return; }
+  if(!cn.sound){ releaseAudio(); return; }
   unlockAudio(true); setTimeout(async()=>{ if(!(await playTone(cn.tone))) toast("Ton konnte nicht abgespielt werden. Ist das Handy laut gestellt?"); },80);
 };
 let mbTimer=null, mbConv=null, mbCount=0;
@@ -2306,7 +2309,7 @@ function showChatBanner(m,count){
   clearTimeout(mbTimer); mbTimer=setTimeout(hideChatBanner,6000);
 }
 function hideChatBanner(){ const el=$("#msgBanner"); if(el.hidden) return; el.classList.add("out"); setTimeout(()=>{el.hidden=true;el.classList.remove("out");el.style.transform="";},300); }
-function openChatTo(c){ closeSheets(); setAddMode(false); openSheet("#sheetChat"); chatOpen=true; selMsg=null; openConv(c); }
+function openChatTo(c){ closeSheets(); setAddMode(false); openSheet("#sheetChat"); chatOpen=true; selMsg=null; unlockAudio(false); openConv(c); }
 (function(){
   const el=$("#msgBanner"); let y0=null, dy=0;
   el.addEventListener("touchstart",e=>{y0=e.touches[0].clientY;dy=0;clearTimeout(mbTimer);},{passive:true});
