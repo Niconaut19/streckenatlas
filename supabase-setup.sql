@@ -122,3 +122,22 @@ create policy "Zuletzt online sehen"   on public.last_seen for select to authent
 create policy "Zuletzt online setzen"  on public.last_seen for insert to authenticated with check (user_id = auth.uid() and is_member());
 create policy "Zuletzt online ändern"  on public.last_seen for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy "Zuletzt online löschen" on public.last_seen for delete to authenticated using (user_id = auth.uid());
+
+-- Bahnübergänge: eigene Kilometer-Angaben des Teams (lesen alle Mitarbeiter, ändern nur Admins)
+create table if not exists public.bue_km (
+  id uuid primary key default gen_random_uuid(),
+  lat double precision not null,
+  lng double precision not null,
+  km numeric(9,3) not null check (km between -50 and 1000),
+  strecke text check (strecke ~ '^[0-9]{4}$'),
+  nr text check (char_length(nr) <= 30),
+  name text check (char_length(name) <= 80),
+  updated_by uuid default auth.uid() references public.profiles(id) on delete set null,
+  updated_at timestamptz not null default now()
+);
+alter table public.bue_km enable row level security;
+create policy "BÜ lesen"    on public.bue_km for select to authenticated using (is_member());
+create policy "BÜ anlegen"  on public.bue_km for insert to authenticated with check (is_admin());
+create policy "BÜ ändern"   on public.bue_km for update to authenticated using (is_admin()) with check (is_admin());
+create policy "BÜ löschen"  on public.bue_km for delete to authenticated using (is_admin());
+alter publication supabase_realtime add table public.bue_km;

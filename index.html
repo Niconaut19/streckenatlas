@@ -474,6 +474,9 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 .pop .t{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--muted)}
 .pop h4{margin:4px 0 2px;font-size:18px;font-weight:800;padding-right:20px}
 .pop p{margin:8px 0}
+.bue2{display:grid;grid-template-columns:1fr 1.3fr;gap:10px}
+.pop .bueedit{display:flex;width:100%;justify-content:center;align-items:center;gap:6px;margin:8px 0 2px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--grey-2,#d7dce1);background:var(--white);color:var(--ink);font:700 14px var(--sans);cursor:pointer}
+.pop .ownkm{display:inline-block;font-size:11.5px;font-weight:700;color:#8a5a00;background:#fff1d6;border-radius:6px;padding:1px 6px;margin-left:4px;vertical-align:middle}
 .pop .meta{color:var(--muted);font-size:12.5px;border-top:1px solid var(--grey-1);padding-top:8px}
 .maplibregl-ctrl-attrib{font-size:10px;background:color-mix(in srgb,var(--white) 85%,transparent)!important;color:var(--ink)}
 .maplibregl-ctrl-attrib a{color:var(--ink)!important}
@@ -785,6 +788,20 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
   </div>
 </div>
 
+<div class="modal" id="bueEdit" hidden role="dialog" aria-modal="true" aria-labelledby="bueHead">
+  <div class="card">
+    <h2 id="bueHead">Bahnübergang: Kilometer eintragen</h2>
+    <p class="hint" id="bueHint">Deine Angabe gilt für das ganze Team und ersetzt den Wert aus den Kartendaten.</p>
+    <div class="bue2"><div class="field"><label for="bueLine">Strecke</label><input id="bueLine" inputmode="numeric" list="kmLines" placeholder="5503" maxlength="12"></div>
+    <div class="field"><label for="bueKm">Kilometer</label><input id="bueKm" inputmode="decimal" placeholder="12,345" maxlength="14"></div></div>
+    <div class="field"><label for="bueNr">BÜ-Nummer oder Bezeichnung (optional)</label><input id="bueNr" maxlength="30" placeholder="z. B. BÜ 12"></div>
+    <div class="field"><label for="bueName">Name / Straße (optional)</label><input id="bueName" maxlength="80" placeholder="z. B. Kreisstraße NM 5"></div>
+    <p class="hint" id="bueErr" style="color:var(--red)" hidden></p>
+    <button class="btn primary block" id="bueSave">Speichern</button>
+    <button class="btn danger block" id="bueDel" hidden>Eigene Angabe löschen</button>
+    <button class="btn block" id="bueBack">Abbrechen</button>
+  </div>
+</div>
 <div class="modal" id="confirmDel" hidden role="dialog" aria-modal="true" aria-labelledby="dHead">
   <div class="card">
     <h2 id="dHead">Objekt entfernen?</h2>
@@ -979,6 +996,15 @@ function supabaseBackend(){
         set(on){ want=on; if(!joined) return; on?ch.track({at:new Date().toISOString()}):ch.untrack(); }
       };
     },
+    async listBueFix(){const {data,error}=await sb.from("bue_km").select("*"); return error?[]:data;},
+    async saveBueFix(r){const {data:{session}}=await sb.auth.getSession();
+      const row={...r,updated_by:session?.user?.id,updated_at:new Date().toISOString()};
+      const q=r.id?sb.from("bue_km").update(row,{count:"exact"}).eq("id",r.id):sb.from("bue_km").insert(row,{count:"exact"});
+      const {error,count}=await q;
+      if(error) throw new Error(/bue_km/.test(error.message)?"Bitte zuerst das SQL für die Bahnübergänge in Supabase ausführen.":/row-level|policy/i.test(error.message)?"Nur Admins dürfen das ändern.":error.message);
+      if(!count) throw new Error("Nur Admins dürfen das ändern.");},
+    async deleteBueFix(id){const {error,count}=await sb.from("bue_km").delete({count:"exact"}).eq("id",id); if(error) throw error; if(!count) throw new Error("Nur Admins dürfen das ändern.");},
+    subscribeBueFix(cb){sb.channel("bue_km").on("postgres_changes",{event:"*",schema:"public",table:"bue_km"},cb).subscribe();},
     async listSeen(){const {data,error}=await sb.from("last_seen").select("*"); return error?[]:data;},
     async setSeen(){const {data:{session}}=await sb.auth.getSession(); if(!session) return;
       await sb.from("last_seen").upsert({user_id:session.user.id,seen_at:new Date().toISOString()},{onConflict:"user_id"});},
@@ -1019,7 +1045,13 @@ function demoBackend(){
     subscribeReads(){},
     presence(uid,onSync){ return {set(on){ onSync(on?[uid]:[]); }}; },
     async listSeen(){return [{user_id:"u-anna",seen_at:new Date(Date.now()-17*60000).toISOString()},{user_id:"u-ben",seen_at:new Date(Date.now()-26*3600000).toISOString()}];},
-    async setSeen(){}, async clearSeen(){}
+    async setSeen(){}, async clearSeen(){},
+    async listBueFix(){return store.get("sa_demo_bue",[]);},
+    async saveBueFix(r){if(users.find(x=>x.id===current).role!=="admin") throw new Error("Nur Admins dürfen das ändern.");
+      const a=store.get("sa_demo_bue",[]), row={...r,id:r.id||crypto.randomUUID(),updated_by:current,updated_at:new Date().toISOString()};
+      store.set("sa_demo_bue",[...a.filter(x=>x.id!==row.id),row]);},
+    async deleteBueFix(id){if(users.find(x=>x.id===current).role!=="admin") throw new Error("Nur Admins dürfen das ändern."); store.set("sa_demo_bue",store.get("sa_demo_bue",[]).filter(x=>x.id!==id));},
+    subscribeBueFix(){}
   };
 }
 const api = CONFIG.SUPABASE_URL ? supabaseBackend() : demoBackend();
@@ -1179,7 +1211,7 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",()=>{if(s
 
 /* Neue Version erkennen: eigene Version mit version.json auf dem Server vergleichen.
    Die Version ändert sich nur, wenn sich die App wirklich geändert hat (nicht bei Daten-Updates). */
-const APP_VERSION="a50768e108", APP_DATE="2026-11-17T16:01:28Z";
+const APP_VERSION="076ce2ecfe", APP_DATE="2026-11-20T16:05:33Z";
 async function serverVersion(){
   try{ const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); if(!r.ok) return null; return (await r.json()).v||null; }catch{ return null; }
 }
@@ -1258,9 +1290,29 @@ map.on("load",loadBayern);
 let allPts=[];
 const ptsOn = store.get("sa_pts",{bst:true,bue:true});
 async function loadPoints(){
-  try{const r=await fetch("data/punkte-bayern.geojson",{cache:"no-cache"}); if(!r.ok) return; allPts=(await r.json()).features; updatePoints();}
+  try{const r=await fetch("data/punkte-bayern.geojson",{cache:"no-cache"}); if(!r.ok) return; basePts=(await r.json()).features; rebuildPts();}
   catch{}
 }
+/* Eigene Angaben zu Bahnübergängen (aus Supabase). Sie werden über die Lage dem nächsten
+   Bahnübergang aus den Kartendaten zugeordnet (bis 25 m), damit sie auch nach einem Daten-Update passen.
+   Gibt es dort keinen, erscheint die Angabe als eigener Bahnübergang. */
+let basePts=[], bueFix=[];
+function rebuildPts(){
+  const bues=basePts.filter(f=>f.properties.t==="bue"), used=new Map();
+  for(const fx of bueFix){
+    let best=null, bd=25;
+    for(const f of bues){ const [x,y]=f.geometry.coordinates; if(Math.abs(y-fx.lat)>0.0005||Math.abs(x-fx.lng)>0.0008) continue;
+      const d=distM([x,y],[fx.lng,fx.lat]); if(d<bd&&!used.has(f)){bd=d;best=f;} }
+    if(best) used.set(best,fx); else used.set({geometry:{type:"Point",coordinates:[fx.lng,fx.lat]},properties:{t:"bue"}},fx);
+  }
+  const fixProps=(f,fx)=>{const p={...f.properties,fid:fx.id};
+    if(fx.km!=null) p.km=+fx.km; if(fx.strecke) p.s=fx.strecke; if(fx.nr) p.r=fx.nr; if(fx.name) p.n=fx.name;
+    return {type:"Feature",geometry:{type:"Point",coordinates:f.geometry.coordinates},properties:p};};
+  allPts=basePts.map(f=>used.has(f)?fixProps(f,used.get(f)):f);
+  used.forEach((fx,f)=>{ if(!basePts.includes(f)) allPts.push(fixProps(f,fx)); });
+  updatePoints();
+}
+async function loadBueFix(){ try{ bueFix=await api.listBueFix(); }catch{ bueFix=[]; } rebuildPts(); }
 map.on("load",loadPoints);
 let allKm=[];
 async function loadKm(){
@@ -1285,6 +1337,14 @@ function kmAt(lat,lng,l){
   const ab=Math.hypot(a.x-b.x,a.y-b.y), dir=Math.sign(b.km-a.km)||1;
   if(a.d+b.d<=ab*1.25) return a.km+(b.km-a.km)*a.d/(a.d+b.d);
   return a.km-dir*a.d/1000;
+}
+const fmtKm3=v=>v.toLocaleString("de-DE",{minimumFractionDigits:3,maximumFractionDigits:3});
+/* "12,345" · "12.345" · "12,3+45" (km + Meter) -> 12.345 */
+function parseKmInput(v){
+  v=String(v||"").trim().replace(/^km\s*/i,"").replace(/\s/g,"").replace(",",".");
+  if(!v) return null;
+  const m=v.match(/^(-?\d+(?:\.\d+)?)(?:\+(\d+(?:\.\d+)?))?$/); if(!m) return NaN;
+  return Math.round((parseFloat(m[1])+(m[2]?parseFloat(m[2])/1000:0))*1000)/1000;
 }
 const fmtKm=v=>"km "+v.toLocaleString("de-DE",{minimumFractionDigits:1,maximumFractionDigits:1});
 $("#ptsBst").checked=ptsOn.bst!==false; $("#ptsBue").checked=ptsOn.bue!==false;
@@ -1412,11 +1472,19 @@ map.on("click",e=>{
     const title = p.t==="bue" ? (p.n||"Bahnübergang") : (p.n||p.r);
     const kind = p.t==="bue" ? "Bahnübergang" : (BST_KIND[p.k]||"Betriebsstelle");
     const isBue=p.t==="bue", exact=isBue&&p.km!=null&&p.km!=="";
+    const fx=p.fid?bueFix.find(x=>x.id===p.fid):null;
     const refLabel=p.r?(isBue?` · Nr. <b>${esc(p.r)}</b>`:` · DS100 <b>${esc(p.r)}</b>`):"";
-    const kmLine=exact?`<p class="kmexact">km ${(+p.km).toLocaleString("de-DE",{minimumFractionDigits:3,maximumFractionDigits:3})}</p>`:"";
-    const chips=exact?refChips(nearLineRefs(lat,lng,150)):refChips(nearLineRefs(lat,lng,150),lat,lng);
-    const note=isBue?(exact?"Kilometrierung laut hinterlegten Daten<br>":"Genaue Kilometrierung für diesen Bahnübergang nicht hinterlegt, km-Wert ist ungefähr<br>"):"";
-    html=`<div class="pop"><span class="t">${esc(kind)}${refLabel}</span><h4>${esc(title)}</h4>${kmLine}${chips}${navLinks(m)}<p class="meta">${note}${lat.toFixed(5)}, ${lng.toFixed(5)}</p></div>`;
+    const kmLine=exact?`<p class="kmexact">km ${fmtKm3(+p.km)}${fx?`<span class="ownkm">Team-Angabe</span>`:""}</p>`:"";
+    let chips;
+    if(fx&&fx.strecke){ const l=[...lines.values()].find(x=>x.ref===fx.strecke); chips=`<div class="chips"><span class="chip-ref" style="background:${l?l.color:"#646973"}">${esc(fx.strecke)}</span></div>`; }
+    else chips=exact?refChips(nearLineRefs(lat,lng,150)):refChips(nearLineRefs(lat,lng,150),lat,lng);
+    let note="";
+    if(isBue){
+      if(fx){ const who=(team.find(t=>t.id===fx.updated_by)||(me&&me.id===fx.updated_by?me:null)); note=`Vom Team eingetragen${who?` von ${esc(pName(who))}`:""}${fx.updated_at?` am ${fmtDate(fx.updated_at)}`:""}<br>`; }
+      else note=exact?"Kilometrierung laut Kartendaten (OpenStreetMap)<br>":"Genaue Kilometrierung nicht hinterlegt, km-Wert ist ungefähr<br>";
+    }
+    const editBtn=isBue&&me&&me.role==="admin"?`<button class="bueedit" data-bueedit="${lng},${lat}" data-fid="${esc(p.fid||"")}" data-km="${exact?p.km:""}" data-r="${esc(p.r||"")}" data-n="${esc(p.n||"")}">✎ ${fx?"Angaben ändern":exact?"Kilometer korrigieren":"Kilometer eintragen"}</button>`:"";
+    html=`<div class="pop"><span class="t">${esc(kind)}${refLabel}</span><h4>${esc(title)}</h4>${kmLine}${chips}${editBtn}${navLinks(m)}<p class="meta">${note}${lat.toFixed(5)}, ${lng.toFixed(5)}</p></div>`;
   }
   openPopup&&openPopup.remove();
   openPopup=new maplibregl.Popup({offset:10,maxWidth:"290px"}).setLngLat(f.geometry.type==="Point"?f.geometry.coordinates:e.lngLat).setHTML(html).addTo(map);
@@ -2738,6 +2806,49 @@ $("#nbShow").onclick=()=>{
   openPopup=new maplibregl.Popup({offset:[0,-40],maxWidth:"290px"}).setLngLat([m.lng,m.lat]).setHTML(popupHtml(m)).addTo(map);
 };
 
+/* Bahnübergang: Kilometer eintragen oder korrigieren (nur Admins) */
+let bueCur=null;
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-bueedit]"); if(!b) return;
+  const [lng,lat]=b.dataset.bueedit.split(",").map(Number), fx=b.dataset.fid?bueFix.find(x=>x.id===b.dataset.fid):null;
+  bueCur={lat,lng,fx};
+  const near=nearLineRefs(lat,lng,150);
+  $("#bueLine").value=fx?.strecke||(near[0]?.ref||"");
+  const k=fx?.km!=null?+fx.km:(b.dataset.km!==""?+b.dataset.km:null);
+  $("#bueKm").value=k!=null?fmtKm3(k):"";
+  if(k==null&&near[0]){ const a=kmAt(lat,lng,near[0]); $("#bueKm").placeholder=a!=null?`ca. ${a.toLocaleString("de-DE",{maximumFractionDigits:1})}`:"12,345"; }
+  $("#bueNr").value=fx?.nr||b.dataset.r||""; $("#bueName").value=fx?.name||b.dataset.n||"";
+  $("#bueDel").hidden=!fx; $("#bueErr").hidden=true;
+  $("#bueHead").textContent=fx?"Bahnübergang: Angaben ändern":"Bahnübergang: Kilometer eintragen";
+  openPopup&&openPopup.remove();
+  $("#bueEdit").hidden=false; setTimeout(()=>$("#bueKm").focus(),60);
+});
+const bueClose=()=>{$("#bueEdit").hidden=true; bueCur=null;};
+$("#bueBack").onclick=bueClose;
+$("#bueEdit").addEventListener("click",e=>{ if(e.target.id==="bueEdit") bueClose(); });
+$("#bueSave").onclick=async()=>{
+  if(!bueCur) return;
+  const err=t=>{$("#bueErr").textContent=t;$("#bueErr").hidden=false;};
+  const km=parseKmInput($("#bueKm").value);
+  if(km==null) return err("Bitte den Kilometer eintragen, z. B. 12,345");
+  if(Number.isNaN(km)||km<-50||km>1000) return err("Der Kilometer ist nicht lesbar. Beispiele: 12,345 oder 12,3+45");
+  const strecke=$("#bueLine").value.trim();
+  if(strecke&&!/^\d{4}$/.test(strecke)) return err("Streckennummer bitte 4-stellig, z. B. 5503");
+  const row={lat:+bueCur.lat.toFixed(6),lng:+bueCur.lng.toFixed(6),km,strecke:strecke||null,nr:$("#bueNr").value.trim()||null,name:$("#bueName").value.trim()||null};
+  if(bueCur.fx) row.id=bueCur.fx.id;
+  $("#bueSave").disabled=true;
+  try{ await api.saveBueFix(row); bueClose(); vibrate(20); toast("Bahnübergang gespeichert"); await loadBueFix(); }
+  catch(e2){ err(e2.message||"Speichern hat nicht geklappt"); }
+  finally{ $("#bueSave").disabled=false; }
+};
+$("#bueDel").onclick=async()=>{
+  const db=$("#bueDel"); if(!bueCur?.fx) return;
+  if(!db.classList.contains("armed")){db.classList.add("armed");db.textContent="Wirklich löschen?";return;}
+  try{ await api.deleteBueFix(bueCur.fx.id); bueClose(); toast("Eigene Angabe gelöscht, es gilt wieder der Kartenwert"); await loadBueFix(); }
+  catch(e2){ $("#bueErr").textContent=e2.message; $("#bueErr").hidden=false; }
+  finally{ db.classList.remove("armed"); db.textContent="Eigene Angabe löschen"; }
+};
+
 async function start(){
   me = await api.me();
   if(recovering) return;
@@ -2750,7 +2861,8 @@ async function start(){
   $("#profRole").textContent=me.role==="admin"?"Admin":"Mitarbeiter"; $("#profRole").className="rolepill"+(me.role==="admin"?" admin":"");
   $("#userRole").textContent=me.role==="admin"?"Admin":"Mitarbeiter"; $("#userRole").className=me.role==="admin"?"admin":"";
   await refreshMarkers();
-  if(!subscribed){api.subscribe(()=>refreshMarkers());api.subscribeMessages(onChatChange);api.subscribeReads(onReadChange);subscribed=true;}
+  loadBueFix();
+  if(!subscribed){api.subscribe(()=>refreshMarkers());api.subscribeBueFix(()=>loadBueFix());api.subscribeMessages(onChatChange);api.subscribeReads(onReadChange);subscribed=true;}
   loadReads(); startPresence();
   loadChat();
   if(api.demo && !store.get("sa_demo_seen",false)){store.set("sa_demo_seen",true);toast("Demo-Modus: Daten bleiben nur auf diesem Gerät");}
