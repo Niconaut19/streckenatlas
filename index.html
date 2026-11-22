@@ -1066,11 +1066,58 @@ const ORM = [
 ];
 const ormAttr = 'Bahndaten <a href="https://www.openrailwaymap.org" target="_blank">OpenRailwayMap</a>, © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>';
 const emptyFC = {type:"FeatureCollection",features:[]};
+
+/* Bayerisches Luftbild genau an der Landesgrenze abschneiden.
+   Der Dienst liefert außerhalb von Bayern weiße Flächen, die sonst das weltweite Satellitenbild verdecken.
+   Kacheln ganz in Bayern bleiben unverändert, ganz außerhalb werden gar nicht geladen,
+   nur an der Grenze wird die Kachel entlang des Umrisses zugeschnitten. */
+const DOP_URL="https://geoservices.bayern.de/od/wms/dop/v1/dop20?service=WMS&request=GetMap&version=1.1.1&layers=by_dop20c&styles=&format=image/jpeg&srs=EPSG:3857&bbox={bbox-epsg-3857}&width=512&height=512";
+const MERC=20037508.342789244;
+function dopTileUrl(z,x,y){const w=2*MERC/2**z, minx=-MERC+x*w, maxy=MERC-y*w; return DOP_URL.replace("{bbox-epsg-3857}",`${minx},${maxy-w},${minx+w},${maxy}`);}
+let byRings=null, byEdges=null;
+const byReady=fetch("data/bayern-grenze.json").then(r=>r.ok?r.json():null).then(j=>{
+  if(!Array.isArray(j)||!j.length) return;
+  byRings=j; byEdges=[];
+  for(const r of j) for(let i=1;i<r.length;i++){const [a,b]=[r[i-1],r[i]]; byEdges.push([Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[0],b[0]),Math.max(a[1],b[1])]);}
+}).catch(()=>{});
+function inBayern(lng,lat){ let ins=false;
+  for(const r of byRings) for(let i=0,j=r.length-1;i<r.length;j=i++){const [xi,yi]=r[i],[xj,yj]=r[j];
+    if((yi>lat)!==(yj>lat)&&lng<(xj-xi)*(lat-yi)/(yj-yi)+xi) ins=!ins;}
+  return ins; }
+const t2lng=(x,z)=>x/2**z*360-180;
+const t2lat=(y,z)=>{const n=Math.PI-2*Math.PI*y/2**z; return 180/Math.PI*Math.atan(Math.sinh(n));};
+function tileClass(z,x,y){
+  if(!byRings) return "in";
+  const w=t2lng(x,z), e=t2lng(x+1,z), n=t2lat(y,z), s=t2lat(y+1,z);
+  for(const b of byEdges) if(b[0]<=e&&b[2]>=w&&b[1]<=n&&b[3]>=s) return "edge";
+  return inBayern((w+e)/2,(n+s)/2)?"in":"out";
+}
+let emptyTile=null;
+async function canvasPng(c){ if(c.convertToBlob) return (await c.convertToBlob({type:"image/png"})).arrayBuffer();
+  return new Promise((res,rej)=>c.toBlob(b=>b?b.arrayBuffer().then(res,rej):rej(new Error("png")),"image/png")); }
+const mkCanvas=n=>typeof OffscreenCanvas!=="undefined"?new OffscreenCanvas(n,n):Object.assign(document.createElement("canvas"),{width:n,height:n});
+if(maplibregl.addProtocol) maplibregl.addProtocol("dopby",async(params,abort)=>{
+  const [z,x,y]=params.url.replace("dopby://","").split("/").map(Number);
+  await byReady;
+  const cls=tileClass(z,x,y);
+  if(cls==="out"){ if(!emptyTile){ const c=mkCanvas(8); c.getContext("2d").clearRect(0,0,8,8); emptyTile=await canvasPng(c); } return {data:emptyTile.slice(0)}; }
+  const res=await fetch(dopTileUrl(z,x,y),{signal:abort&&abort.signal});
+  if(!res.ok) throw new Error("Luftbild "+res.status);
+  if(cls==="in") return {data:await res.arrayBuffer()};
+  const img=await createImageBitmap(await res.blob()), S=img.width||512, c=mkCanvas(S), g=c.getContext("2d");
+  const px=lng=>((lng+180)/360*2**z-x)*S;
+  const py=lat=>{const r=lat*Math.PI/180; return ((1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*2**z-y)*S;};
+  g.beginPath();
+  for(const r of byRings){ r.forEach(([lng,lat],i)=>{const X=px(lng),Y=py(lat); i?g.lineTo(X,Y):g.moveTo(X,Y);}); g.closePath(); }
+  g.clip("evenodd"); g.drawImage(img,0,0,S,S);
+  return {data:await canvasPng(c)};
+});
+
 const sources = {
   sat:{type:"raster",tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],tileSize:256,maxzoom:19,attribution:"Bilder © Esri, Maxar, Earthstar Geographics"},
   flur:{type:"raster",tiles:["https://geoservices.bayern.de/od/wms/alkis/v1/parzellarkarte?service=WMS&request=GetMap&version=1.1.1&layers=by_alkis_parzellarkarte_umr_gelb&styles=&format=image/png&transparent=true&srs=EPSG:3857&bbox={bbox-epsg-3857}&width=512&height=512"],
     tileSize:256,minzoom:15,maxzoom:20,bounds:[8.9,47.2,13.9,50.6],attribution:'Flurstücke © <a href="https://geodaten.bayern.de" target="_blank">Bayerische Vermessungsverwaltung</a>, CC BY 4.0'},
-  dop:{type:"raster",tiles:["https://geoservices.bayern.de/od/wms/dop/v1/dop20?service=WMS&request=GetMap&version=1.1.1&layers=by_dop20c&styles=&format=image/jpeg&srs=EPSG:3857&bbox={bbox-epsg-3857}&width=512&height=512"],
+  dop:{type:"raster",tiles:[maplibregl.addProtocol?"dopby://{z}/{x}/{y}":DOP_URL],
     tileSize:256,minzoom:11,maxzoom:20,bounds:[8.9,47.2,13.9,50.6],attribution:'Luftbild © <a href="https://geodaten.bayern.de" target="_blank">Bayerische Vermessungsverwaltung</a>, CC BY 4.0'},
   labels:{type:"raster",tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"],tileSize:256,maxzoom:19},
   osm:{type:"raster",tiles:["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],tileSize:256,maxzoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'},
@@ -1211,7 +1258,7 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",()=>{if(s
 
 /* Neue Version erkennen: eigene Version mit version.json auf dem Server vergleichen.
    Die Version ändert sich nur, wenn sich die App wirklich geändert hat (nicht bei Daten-Updates). */
-const APP_VERSION="ba94adfa72", APP_DATE="2026-11-22T11:51:31Z";
+const APP_VERSION="7eedb3f3cb", APP_DATE="2026-11-22T11:56:21Z";
 async function serverVersion(){
   try{ const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); if(!r.ok) return null; return (await r.json()).v||null; }catch{ return null; }
 }
@@ -2503,7 +2550,7 @@ function tilesInBounds(b,z){
   return set;
 }
 const inBY=(z,x,y)=>{const n=2**z, lon=x/n*360-180, lat=Math.atan(Math.sinh(Math.PI*(1-2*(y+.5)/n)))*180/Math.PI; return lon>=BY[0]-.1&&lon<=BY[2]+.1&&lat>=BY[1]-.1&&lat<=BY[3]+.1;};
-function dopUrl(z,x,y){const w=2*RM/2**z, minx=-RM+x*w, maxy=RM-y*w; return sources.dop.tiles[0].replace("{bbox-epsg-3857}",`${minx},${maxy-w},${minx+w},${maxy}`);}
+const dopUrl=dopTileUrl;
 const dopKey=(z,x,y)=>`https://tilecache.streckenatlas/dop/${z}/${x}/${y}`;
 const omtKey=(z,x,y)=>`https://tilecache.streckenatlas/omt/${z}/${x}/${y}`;
 async function omtTemplate(){ const r=await fetch("https://tiles.openfreemap.org/planet"); const j=await r.json(); return j.tiles[0]; }

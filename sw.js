@@ -11,7 +11,7 @@ const SHELL_URLS = [
   "https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css",
   "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"
 ];
-const DATA_URLS = ["./data/strecken-bayern.geojson", "./data/punkte-bayern.geojson", "./data/km-bayern.geojson"];
+const DATA_URLS = ["./data/strecken-bayern.geojson", "./data/punkte-bayern.geojson", "./data/km-bayern.geojson", "./data/bayern-grenze.json"];
 
 self.addEventListener("install", e => {
   e.waitUntil((async () => {
