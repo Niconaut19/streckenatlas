@@ -501,7 +501,6 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 <div class="top">
   <button class="brand brandbtn" id="btnReload" title="App aktualisieren" aria-label="App aktualisieren"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M8 3 6 21M16 3l2 18M6.8 8h10.4M6.2 14h11.6"/></svg></span>Streckenatlas</button>
   <div class="spacer"></div>
-  <button class="chip iconchip" id="btnKm" hidden title="Suchen" aria-label="Suchen"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg></button>
   <button class="chip iconchip" id="btnSettings" hidden title="Einstellungen" aria-label="Einstellungen"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   <button class="chip" id="userChip" hidden><span class="avatar" id="userAvatar"></span><span class="who"><b id="userName"></b><small id="userRole"></small></span></button>
 </div>
@@ -509,6 +508,7 @@ button:focus-visible,.opt:focus-within{outline:2px solid var(--red);outline-offs
 <div class="fabs" id="fabs" hidden>
   <button class="fab" id="btnCompass" title="Nach Norden ausrichten" aria-label="Nach Norden ausrichten">
     <svg viewBox="0 0 24 24" id="compassIcon"><path class="n" d="M12 3l3.5 9h-7z"/><path class="s" d="M12 21l-3.5-9h7z"/></svg></button>
+  <button class="fab" id="btnKm" title="Suchen" aria-label="Suchen"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg></button>
   <button class="fab" id="btnLayers" title="Ebenen und Strecken" aria-label="Ebenen und Strecken">
     <svg viewBox="0 0 24 24"><path d="M12 3 2 8l10 5 10-5-10-5z"/><path d="m2 13 10 5 10-5"/></svg></button>
   <button class="fab" id="btnChat" title="Chat" aria-label="Chat"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.8 7L4 20.5l1.5-4.6A8 8 0 1 1 21 12z"/></svg><span class="badge" id="chatBadge" hidden></span></button>
@@ -1211,7 +1211,7 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",()=>{if(s
 
 /* Neue Version erkennen: eigene Version mit version.json auf dem Server vergleichen.
    Die Version ändert sich nur, wenn sich die App wirklich geändert hat (nicht bei Daten-Updates). */
-const APP_VERSION="076ce2ecfe", APP_DATE="2026-11-20T16:05:33Z";
+const APP_VERSION="f65e1c5f58", APP_DATE="2026-11-22T07:54:00Z";
 async function serverVersion(){
   try{ const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); if(!r.ok) return null; return (await r.json()).v||null; }catch{ return null; }
 }
@@ -2854,7 +2854,7 @@ async function start(){
   if(recovering) return;
   $("#gate").hidden = !!me; $("#pending").hidden = !(me && me.role==="wartend");
   const active = me && me.role!=="wartend";
-  $("#fabs").hidden=!active; $("#userChip").hidden=!active; $("#btnKm").hidden=!active; $("#btnSettings").hidden=!active;
+  $("#fabs").hidden=!active; $("#userChip").hidden=!active; $("#btnSettings").hidden=!active;
   if(!active) return;
   $("#userName").textContent=me.name; $("#userAvatar").textContent=(me.name||"?")[0].toUpperCase();
   $("#profName").textContent=me.name; $("#profMail").textContent=me.email||""; $("#profAvatar").textContent=(me.name||"?")[0].toUpperCase();
