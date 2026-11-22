@@ -1211,7 +1211,7 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",()=>{if(s
 
 /* Neue Version erkennen: eigene Version mit version.json auf dem Server vergleichen.
    Die Version ändert sich nur, wenn sich die App wirklich geändert hat (nicht bei Daten-Updates). */
-const APP_VERSION="f65e1c5f58", APP_DATE="2026-11-22T07:54:00Z";
+const APP_VERSION="ba94adfa72", APP_DATE="2026-11-22T11:51:31Z";
 async function serverVersion(){
   try{ const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); if(!r.ok) return null; return (await r.json()).v||null; }catch{ return null; }
 }
@@ -2036,7 +2036,9 @@ function localHits(q){
   return out;
 }
 async function placeHits(q,signal){
-  const r=await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lang=de&limit=7&bbox=8.9,47.2,13.9,50.6`,{signal});
+  // weltweit suchen, Treffer in der Nähe des Kartenausschnitts zuerst
+  const c=map.getCenter(), z=Math.max(4,Math.min(14,Math.round(map.getZoom())));
+  const r=await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lang=de&limit=8&lat=${c.lat.toFixed(4)}&lon=${c.lng.toFixed(4)}&zoom=${z}&location_bias_scale=0.3`,{signal});
   if(!r.ok) throw new Error(r.status);
   const j=await r.json(), out=[], seen=new Set();
   for(const f of j.features||[]){
@@ -2048,7 +2050,8 @@ async function placeHits(q,signal){
     else if(p.osm_key==="place"){title=p.name;kind=PLACE_LABEL[p.osm_value]||"Ort";zoom=PLACE_ZOOM[p.osm_value]||14;}
     else {title=p.name;kind="Ort";zoom=16;}
     if(!title) continue;
-    const where=[p.postcode&&kind!=="Stadt"?p.postcode:"",(p.city&&p.city!==title?p.city:"")||(p.county&&p.county!==title?p.county:"")].filter(Boolean).join(" ");
+    const land=p.countrycode&&p.countrycode!=="DE"?(p.country||p.countrycode):"";
+    const where=[p.postcode&&kind!=="Stadt"?p.postcode:"",(p.city&&p.city!==title?p.city:"")||(p.county&&p.county!==title?p.county:"")||(p.state&&p.state!==title&&land?p.state:""),land?`(${land})`:""].filter(Boolean).join(" ");
     const sub=[kind,where].filter(Boolean).join(" · ");
     const key=title+"|"+sub; if(seen.has(key)) continue; seen.add(key);
     out.push({kind:kind==="Adresse"||kind==="Straße"?"addr":"place",title,sub,ll:f.geometry.coordinates,zoom,
