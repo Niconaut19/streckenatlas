@@ -1092,6 +1092,8 @@ function tileClass(z,x,y){
   for(const b of byEdges) if(b[0]<=e&&b[2]>=w&&b[1]<=n&&b[3]>=s) return "edge";
   return inBayern((w+e)/2,(n+s)/2)?"in":"out";
 }
+function jpegComplete(buf){ const u=new Uint8Array(buf), n=u.length; if(n<100||u[0]!==0xFF||u[1]!==0xD8) return n>=100;
+  for(let i=n-1;i>=Math.max(1,n-64);i--) if(u[i]===0xD9&&u[i-1]===0xFF) return true; return false; }
 let emptyTile=null;
 async function canvasPng(c){ if(c.convertToBlob) return (await c.convertToBlob({type:"image/png"})).arrayBuffer();
   return new Promise((res,rej)=>c.toBlob(b=>b?b.arrayBuffer().then(res,rej):rej(new Error("png")),"image/png")); }
@@ -1101,10 +1103,19 @@ if(maplibregl.addProtocol) maplibregl.addProtocol("dopby",async(params,abort)=>{
   await byReady;
   const cls=tileClass(z,x,y);
   if(cls==="out"){ if(!emptyTile){ const c=mkCanvas(8); c.getContext("2d").clearRect(0,0,8,8); emptyTile=await canvasPng(c); } return {data:emptyTile.slice(0)}; }
-  const res=await fetch(dopTileUrl(z,x,y),{signal:abort&&abort.signal});
-  if(!res.ok) throw new Error("Luftbild "+res.status);
-  if(cls==="in") return {data:await res.arrayBuffer()};
-  const img=await createImageBitmap(await res.blob()), S=img.width||512, c=mkCanvas(S), g=c.getContext("2d");
+  // Der Server lehnt bei viel Last manchmal ab oder bricht ab: dann kurz warten und nochmal versuchen.
+  // Unvollständige Bilder nie anzeigen, sonst füllt das iPhone den Rest grau.
+  let buf=null;
+  for(let i=0;i<3&&!buf;i++){
+    if(i) await new Promise(r=>setTimeout(r,600*i));
+    if(abort&&abort.signal&&abort.signal.aborted) throw new Error("abgebrochen");
+    try{ const res=await fetch(dopTileUrl(z,x,y),{signal:abort&&abort.signal});
+      if(res.ok){ const b=await res.arrayBuffer(); if(jpegComplete(b)) buf=b; } }
+    catch(e){ if(abort&&abort.signal&&abort.signal.aborted) throw e; }
+  }
+  if(!buf) throw new Error("Luftbild nicht geladen");
+  if(cls==="in") return {data:buf};
+  const img=await createImageBitmap(new Blob([buf],{type:"image/jpeg"})), S=img.width||512, c=mkCanvas(S), g=c.getContext("2d");
   const px=lng=>((lng+180)/360*2**z-x)*S;
   const py=lat=>{const r=lat*Math.PI/180; return ((1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*2**z-y)*S;};
   g.beginPath();
@@ -1258,7 +1269,7 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",()=>{if(s
 
 /* Neue Version erkennen: eigene Version mit version.json auf dem Server vergleichen.
    Die Version ändert sich nur, wenn sich die App wirklich geändert hat (nicht bei Daten-Updates). */
-const APP_VERSION="7eedb3f3cb", APP_DATE="2026-11-22T11:56:21Z";
+const APP_VERSION="9f7d056148", APP_DATE="2026-11-26T11:17:01Z";
 async function serverVersion(){
   try{ const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); if(!r.ok) return null; return (await r.json()).v||null; }catch{ return null; }
 }

@@ -33,6 +33,7 @@ self.addEventListener("activate", e => e.waitUntil((async () => {
     }
   } catch (err) {}
   await self.clients.claim();
+  await removeBrokenTiles();
 })()));
 
 /* Luftbild Bayern kommt als WMS mit Koordinaten-Ausschnitt. Für den Speicher wird daraus
@@ -65,16 +66,50 @@ async function trimRuntime() {
 }
 let putCount = 0;
 
+/* Bricht der Download einer Kachel ab, ist das Bild unvollständig. Das iPhone füllt den Rest dann grau.
+   Darum nur vollständige Bilder anzeigen und speichern (JPEG endet mit FF D9, PNG mit IEND). */
+function imageComplete(buf, type) {
+  const b = new Uint8Array(buf), n = b.length;
+  if (n < 100) return false;
+  if (/jpe?g/i.test(type) || (b[0] === 0xFF && b[1] === 0xD8)) {
+    for (let i = n - 1; i >= Math.max(1, n - 64); i--) if (b[i] === 0xD9 && b[i - 1] === 0xFF) return true;
+    return false;
+  }
+  if (/png/i.test(type) || (b[0] === 0x89 && b[1] === 0x50)) {
+    const t = String.fromCharCode(...b.slice(Math.max(0, n - 12), n));
+    return t.includes("IEND");
+  }
+  return true;
+}
 async function tileFetch(req, key) {
   const hit = (await caches.match(key, { cacheName: SAVED })) || (await caches.match(key, { cacheName: RUNTIME }));
   if (hit) return hit;
   const res = await fetch(req);
-  if (res.ok) {
-    const c = await caches.open(RUNTIME);
-    await c.put(key, res.clone());
-    if (++putCount % 200 === 0) trimRuntime();
+  if (!res.ok || key.includes("/omt/")) {
+    if (res.ok) { const c = await caches.open(RUNTIME); await c.put(key, res.clone()); }
+    return res;
   }
-  return res;
+  const buf = await res.arrayBuffer(), type = res.headers.get("content-type") || "";
+  if (!imageComplete(buf, type)) return new Response("unvollständig", { status: 502 });
+  const out = new Response(buf, { status: 200, headers: { "content-type": type || "image/jpeg" } });
+  const c = await caches.open(RUNTIME);
+  await c.put(key, out.clone());
+  if (++putCount % 200 === 0) trimRuntime();
+  return out;
+}
+/* Einmalig: bereits gespeicherte, abgebrochene Kacheln (graue Balken) entfernen */
+async function removeBrokenTiles() {
+  for (const name of [RUNTIME, SAVED]) {
+    try {
+      const c = await caches.open(name);
+      for (const req of await c.keys()) {
+        if (req.url.includes("/omt/")) continue;
+        const res = await c.match(req); if (!res) continue;
+        const buf = await res.arrayBuffer();
+        if (!imageComplete(buf, res.headers.get("content-type") || "")) await c.delete(req);
+      }
+    } catch (err) {}
+  }
 }
 async function networkFirst(req, cacheName, timeoutMs, matchOpts) {
   const c = await caches.open(cacheName);
