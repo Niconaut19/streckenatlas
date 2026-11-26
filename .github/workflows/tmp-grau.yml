@@ -1,0 +1,27 @@
+name: tmp grau
+on: workflow_dispatch
+jobs:
+  b:
+    runs-on: ubuntu-latest
+    steps:
+      - run: pip install pillow >/dev/null
+      - shell: python
+        run: |
+          import math, urllib.request, io
+          from PIL import Image
+          R=20037508.342789244
+          U="https://geoservices.bayern.de/od/wms/dop/v1/dop20?service=WMS&request=GetMap&version=1.1.1&layers=by_dop20c&styles=&format=image/jpeg&srs=EPSG:3857&bbox={}&width=512&height=512"
+          def t(lng,lat,z):
+            n=2**z; r=math.radians(lat); return int((lng+180)/360*n), int((1-math.log(math.tan(r)+1/math.cos(r))/math.pi)/2*n)
+          for z in (12,13,14):
+            x0,y0=t(11.50,48.18,z); x1,y1=t(11.65,48.10,z)
+            for x in range(x0,x1+1):
+              for y in range(y0,y1+1):
+                w=2*R/2**z; mx=-R+x*w; my=R-y*w
+                try:
+                  req=urllib.request.Request(U.format(f"{mx},{my-w},{mx+w},{my}"),headers={"User-Agent":"Mozilla/5.0"})
+                  d=urllib.request.urlopen(req,timeout=60); ct=d.headers.get("content-type"); b=d.read()
+                  im=Image.open(io.BytesIO(b)).convert("RGB"); px=list(im.getdata())
+                  g=sum(1 for p in px if all(abs(c-128)<=2 for c in p))/len(px)
+                  print(z,x,y,ct,len(b),f"grau={g:.0%}")
+                except Exception as e: print(z,x,y,"FEHLER",e)
