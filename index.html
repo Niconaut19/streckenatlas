@@ -1269,7 +1269,7 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",()=>{if(s
 
 /* Neue Version erkennen: eigene Version mit version.json auf dem Server vergleichen.
    Die Version ändert sich nur, wenn sich die App wirklich geändert hat (nicht bei Daten-Updates). */
-const APP_VERSION="9f7d056148", APP_DATE="2026-11-26T11:17:01Z";
+const APP_VERSION="2325fc7886", APP_DATE="2026-11-27T15:40:54Z";
 async function serverVersion(){
   try{ const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"}); if(!r.ok) return null; return (await r.json()).v||null; }catch{ return null; }
 }
@@ -1337,7 +1337,7 @@ async function loadBayern(){
       f.properties.color=color;
       lines.set(id,{id,ref,name,color,on:!lineOff[id],feature:f});
     }
-    refreshLinesUI(); fillKmLines();
+    refreshLinesUI(); fillKmLines(); if(bueFix.length) rebuildPts();
   }catch(e){
     $("#linesHint").textContent="Die Streckendaten sind noch nicht da. Sie werden gerade vorbereitet, bitte in ein paar Minuten neu laden.";
   }
@@ -1363,6 +1363,27 @@ function rebuildPts(){
       const d=distM([x,y],[fx.lng,fx.lat]); if(d<bd&&!used.has(f)){bd=d;best=f;} }
     if(best) used.set(best,fx); else used.set({geometry:{type:"Point",coordinates:[fx.lng,fx.lat]},properties:{t:"bue"}},fx);
   }
+  /* Ein BÜ über mehrere Gleise besteht in den Kartendaten aus mehreren Punkten (je Gleis einer).
+     Die Angabe gilt für alle Punkte desselben BÜ: benachbarte Punkte (je bis 15 m, insgesamt bis 40 m),
+     die noch keine eigene Angabe haben. Liegt dort eine andere Strecke, bekommt sie den Wert nicht,
+     weil jede Strecke ihre eigene Kilometrierung hat. */
+  const direct=new Map(used);
+  direct.forEach((fx,anchor)=>{
+    if(!basePts.includes(anchor)) return;
+    const a=anchor.geometry.coordinates, queue=[anchor], seen=new Set([anchor]);
+    while(queue.length){
+      const cur=queue.shift().geometry.coordinates;
+      for(const f of bues){
+        if(seen.has(f)) continue; const c=f.geometry.coordinates;
+        if(Math.abs(c[1]-cur[1])>0.0003||Math.abs(c[0]-cur[0])>0.0004) continue;
+        if(distM(c,cur)>15||distM(c,a)>40) continue;
+        seen.add(f); queue.push(f);
+        if(used.has(f)) continue;
+        if(fx.strecke&&lines.size){ const refs=nearLineRefs(c[1],c[0],12).map(l=>l.ref); if(refs.length&&!refs.includes(fx.strecke)) continue; }
+        used.set(f,fx);
+      }
+    }
+  });
   const fixProps=(f,fx)=>{const p={...f.properties,fid:fx.id};
     if(fx.km!=null) p.km=+fx.km; if(fx.strecke) p.s=fx.strecke; if(fx.nr) p.r=fx.nr; if(fx.name) p.n=fx.name;
     return {type:"Feature",geometry:{type:"Point",coordinates:f.geometry.coordinates},properties:p};};
@@ -2895,7 +2916,9 @@ $("#bueSave").onclick=async()=>{
   if(Number.isNaN(km)||km<-50||km>1000) return err("Der Kilometer ist nicht lesbar. Beispiele: 12,345 oder 12,3+45");
   const strecke=$("#bueLine").value.trim();
   if(strecke&&!/^\d{4}$/.test(strecke)) return err("Streckennummer bitte 4-stellig, z. B. 5503");
-  const row={lat:+bueCur.lat.toFixed(6),lng:+bueCur.lng.toFixed(6),km,strecke:strecke||null,nr:$("#bueNr").value.trim()||null,name:$("#bueName").value.trim()||null};
+  // Bestehende Angabe: Lage nicht ändern, egal an welchem Punkt des BÜ man getippt hat
+  const pos=bueCur.fx?{lat:bueCur.fx.lat,lng:bueCur.fx.lng}:{lat:+bueCur.lat.toFixed(6),lng:+bueCur.lng.toFixed(6)};
+  const row={...pos,km,strecke:strecke||null,nr:$("#bueNr").value.trim()||null,name:$("#bueName").value.trim()||null};
   if(bueCur.fx) row.id=bueCur.fx.id;
   $("#bueSave").disabled=true;
   try{ await api.saveBueFix(row); bueClose(); vibrate(20); toast("Bahnübergang gespeichert"); await loadBueFix(); }
